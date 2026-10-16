@@ -13,6 +13,8 @@
     "seed:projects": "node --experimental-strip-types scripts/seed/add_projects.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
     "dotenv": "17.3.1",
     "drizzle-orm": "0.45.2",
     "lucide-react": "^1.44.0",
