@@ -2,19 +2,23 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, ShieldAlert, ArrowRight, CheckCircle2, Hexagon } from "lucide-react";
+import Image from "next/image";
+import { Lock, Mail, ShieldAlert, ArrowRight, Eye, EyeOff } from "lucide-react";
+
+import logo from "@/assets/images/logofvelloso.png";
+
+import { useApp } from "@/context/AppContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("carlos.silva@construtora.com.br");
-  const [password, setPassword] = useState("123456");
+  const { setProfile } = useApp();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [forgotModalOpen, setForgotModalOpen] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
 
@@ -24,147 +28,159 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || "E-mail ou senha inválidos.");
+        return;
+      }
+
+      if (data.profile) {
+        setProfile(data.profile);
+      }
+
       if (typeof window !== "undefined") {
         localStorage.setItem(
           "rdo_user_session",
           JSON.stringify({
-            email,
-            name: "Alberto Martins",
-            role: "Encarregado Geral de Obra",
+            email: data.profile?.email || email,
+            name: data.profile?.name || "Alberto Martins",
+            role: data.profile?.role || "Encarregado Geral de Obra",
             loggedAt: new Date().toISOString(),
           })
         );
       }
-      router.push("/dashboard");
-    }, 450);
-  };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotEmail) return;
-    setForgotSuccess(true);
-    setTimeout(() => {
-      setForgotModalOpen(false);
-      setForgotSuccess(false);
-      setForgotEmail("");
-    }, 2500);
+      router.push("/dashboard");
+    } catch {
+      setErrorMessage("Não foi possível validar o login. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative overflow-hidden"
-      style={{ background: "#0B0F1A" }}
+      style={{ background: "linear-gradient(160deg, #0B1220 0%, #0F1E36 55%, #0B1220 100%)" }}
     >
-      {/* Decorative gradient orbs */}
+      {/* Decorative gradient orbs in the FVelloso brand blue */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-blue-600/10 blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-indigo-600/10 blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-[#1372B9]/20 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-[#1372B9]/10 blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md">
-        {/* Brand mark above card */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2.5">
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Hexagon className="w-5 h-5 text-white" strokeWidth={2.5} />
-            </div>
-            <div className="text-left">
-              <div className="font-semibold text-white text-[15px] tracking-tight">
-                RDO Construtora
-              </div>
-              <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
-                Gestão de Canteiro
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Login card */}
-        <div className="bg-white rounded-3xl p-7 sm:p-8 shadow-2xl shadow-black/40 border border-slate-100">
-          <div className="mb-6">
+        <div className="bg-white rounded-3xl px-7 pb-7 pt-4 sm:px-9 sm:pb-9 shadow-2xl shadow-black/40">
+          {/* Brand */}
+          <div className="flex justify-center">
+            <Image
+              src={logo}
+              alt="FVelloso — Consultoria em SMS"
+              className="w-40 h-40 object-contain"
+              priority
+            />
+          </div>
+
+          <div className="mb-6 text-center">
             <h1 className="text-[22px] font-semibold text-slate-900 tracking-tight">
               Entrar na plataforma
             </h1>
             <p className="text-[13px] text-slate-500 mt-1">
-              Acesse o painel de registro diário de obra.
+              Gestão de SMS e registro diário de obra.
             </p>
           </div>
 
           {errorMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-[12.5px] font-medium flex items-center gap-2">
+            <div
+              role="alert"
+              className="mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-[12.5px] font-medium flex items-center gap-2"
+            >
               <ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-3.5">
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="relative group">
+              <Mail
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 group-focus-within:text-[#1372B9] transition-colors pointer-events-none"
+                strokeWidth={1.8}
+              />
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder=" "
+                className="peer w-full h-14 pl-11 pr-4 pt-5 pb-1.5 text-[14px] rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-medium transition focus:bg-white focus:border-[#1372B9] focus:outline-none focus:ring-4 focus:ring-[#1372B9]/15"
+              />
+              <label
+                htmlFor="email"
+                className="absolute left-11 top-1/2 -translate-y-1/2 text-[14px] text-slate-400 pointer-events-none transition-all peer-focus:top-[15px] peer-focus:text-[11px] peer-focus:font-semibold peer-focus:text-[#1372B9] peer-[:not(:placeholder-shown)]:top-[15px] peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:font-semibold"
+              >
                 E-mail
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="w-4 h-4" strokeWidth={1.8} />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu.nome@construtora.com.br"
-                  className="w-full pl-10 pr-3.5 py-2.5 text-[13.5px] rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100 text-slate-900 font-medium transition"
-                />
-              </div>
             </div>
 
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
+            <div className="relative group">
+              <Lock
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400 group-focus-within:text-[#1372B9] transition-colors pointer-events-none"
+                strokeWidth={1.8}
+              />
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder=" "
+                className="peer w-full h-14 pl-11 pr-12 pt-5 pb-1.5 text-[14px] rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 font-medium transition focus:bg-white focus:border-[#1372B9] focus:outline-none focus:ring-4 focus:ring-[#1372B9]/15"
+              />
+              <label
+                htmlFor="password"
+                className="absolute left-11 top-1/2 -translate-y-1/2 text-[14px] text-slate-400 pointer-events-none transition-all peer-focus:top-[15px] peer-focus:text-[11px] peer-focus:font-semibold peer-focus:text-[#1372B9] peer-[:not(:placeholder-shown)]:top-[15px] peer-[:not(:placeholder-shown)]:text-[11px] peer-[:not(:placeholder-shown)]:font-semibold"
+              >
                 Senha
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="w-4 h-4" strokeWidth={1.8} />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-3.5 py-2.5 text-[13.5px] rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100 text-slate-900 font-medium transition"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  setForgotModalOpen(true);
-                  setForgotEmail(email);
-                }}
-                className="text-[12.5px] font-medium text-slate-600 hover:text-slate-900 transition"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
               >
-                Esqueci minha senha
+                {showPassword ? (
+                  <EyeOff className="w-[18px] h-[18px]" strokeWidth={1.8} />
+                ) : (
+                  <Eye className="w-[18px] h-[18px]" strokeWidth={1.8} />
+                )}
               </button>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-4.5 px-8 rounded-xl text-white font-medium text-[15.5px] bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] disabled:opacity-60 shadow-sm"
+              className="w-full h-12 mt-2 flex items-center justify-center gap-2 px-6 rounded-2xl text-white font-semibold text-[14px] bg-[#1372B9] hover:bg-[#0F5F9C] transition active:scale-[0.98] disabled:opacity-60 shadow-lg shadow-[#1372B9]/25"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Autenticando
                 </span>
               ) : (
                 <>
                   <span>Entrar</span>
-                  <ArrowRight className="w-6 h-6" strokeWidth={2} />
+                  <ArrowRight className="w-4 h-4" strokeWidth={2} />
                 </>
               )}
             </button>
@@ -179,64 +195,12 @@ export default function LoginPage() {
               </span>
             </p>
           </div>
-
-          <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-center">
-            <p className="text-[11px] font-medium text-slate-500 mb-0.5">
-              Credenciais demo
-            </p>
-            <code className="text-[11px] text-slate-700 font-mono font-medium">
-              carlos.silva@construtora.com.br / 123456
-            </code>
-          </div>
         </div>
+
+        <p className="mt-6 text-center text-[11px] text-slate-500 uppercase tracking-wider">
+          FVelloso SMS · Consultoria em SMS
+        </p>
       </div>
-
-      {/* Forgot Password Modal */}
-      {forgotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 animate-in fade-in">
-            <h3 className="text-[17px] font-semibold text-slate-900 tracking-tight">
-              Recuperar senha
-            </h3>
-            <p className="text-[12.5px] text-slate-500 mt-1.5 leading-relaxed">
-              Informe seu e-mail corporativo. Você receberá um link para redefinir o acesso.
-            </p>
-
-            {forgotSuccess ? (
-              <div className="mt-4 p-3.5 rounded-xl bg-emerald-50 text-emerald-800 text-[12.5px] font-medium flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Instruções enviadas para {forgotEmail}!</span>
-              </div>
-            ) : (
-              <form onSubmit={handleForgotSubmit} className="mt-4 space-y-3">
-                <input
-                  type="email"
-                  required
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="seu.email@construtora.com.br"
-                  className="w-full px-3.5 py-2.5 text-[13px] border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300"
-                />
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setForgotModalOpen(false)}
-                    className="px-3.5 py-2 rounded-xl text-[12.5px] font-medium text-slate-600 hover:bg-slate-100"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-7 py-4 rounded-xl text-[14.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition"
-                  >
-                    Enviar link
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

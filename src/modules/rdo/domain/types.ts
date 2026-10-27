@@ -56,6 +56,8 @@ export interface CreateRdoInput {
   date: string;
   dayStatus?: DayStatus;
   workCondition?: WorkCondition;
+  workConditionMorning?: WorkCondition;
+  workConditionAfternoon?: WorkCondition;
   weatherMorning?: WeatherCondition;
   weatherAfternoon?: WeatherCondition;
   ownTeamCount?: number | string;

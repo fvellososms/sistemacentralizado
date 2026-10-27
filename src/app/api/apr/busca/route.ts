@@ -5,6 +5,7 @@ import { indiceAtividades } from "@/lib/apr/repo";
 import { buscarAtividades, decompor, LIMIAR_SATISFATORIA, relevanciaDe, tokens } from "@/lib/apr/search";
 import type { BuscaResposta, SugestaoAtividade } from "@/lib/apr/types";
 import { getUsuarioAtual } from "@/db/session";
+import { ensureSeeded } from "@/db/seed-apr";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export async function POST(req: Request) {
   }
 
   try {
+    // A busca não tem com o que comparar se a base de conhecimento estiver vazia.
+    await ensureSeeded();
     const usuario = await getUsuarioAtual();
     const indice = await indiceAtividades();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   ChevronLeft,
@@ -11,8 +11,17 @@ import {
   Clock,
   Building,
   Image as ImageIcon,
+  AlertCircle,
+  Bookmark,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import {
+  RDO_DRAFT_KEY,
+  hasDraftContent,
+  getDraftConflict,
+  parseDraft,
+  isDayStopped,
+} from "@/modules/rdo";
 
 interface RdoModalProps {
   isOpen: boolean;
@@ -126,28 +135,26 @@ export function RdoModal({
   initialDate,
   editData,
 }: RdoModalProps) {
-  const { activeProject, setHasLocalDraft } = useApp();
+  const { activeProject, setActiveProject, projects, setHasLocalDraft } = useApp();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState<string | null>(null);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   const [date, setDate] = useState(() => initialDate || new Date().toISOString().split("T")[0]);
-  const [dayStatus, setDayStatus] = useState("trabalhando");
-  const [workCondition, setWorkCondition] = useState("praticavel");
+  const [workConditionMorning, setWorkConditionMorning] = useState("praticavel");
+  const [workConditionAfternoon, setWorkConditionAfternoon] = useState("praticavel");
   const [weatherMorning, setWeatherMorning] = useState("sol");
   const [weatherAfternoon, setWeatherAfternoon] = useState("sol");
 
-  const [ownTeamCount, setOwnTeamCount] = useState<number>(8);
-  const [contractors, setContractors] = useState<ContractorItem[]>([
-    { companyName: "EletroForte Engenharia", trade: "Instalações Elétricas", workerCount: 3 },
-    { companyName: "HidroArte Tubulações", trade: "Instalações Hidrossanitárias", workerCount: 4 },
-  ]);
+  const [ownTeamCount, setOwnTeamCount] = useState<number>(0);
+  const [contractors, setContractors] = useState<ContractorItem[]>([]);
 
   const [nonConformities, setNonConformities] = useState<NonConformityItem[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([
     {
-      description: "Concretagem da laje e vigas superiores do Bloco A",
-      location: "Bloco A · 5º Pavimento",
+      description: "",
+      location: "",
       status: "em_andamento",
       hasOvertime: false,
       overtimeHours: "0",
@@ -157,15 +164,85 @@ export function RdoModal({
   const [observations, setObservations] = useState("");
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
 
-  const DRAFT_KEY = "rdo_draft_v1";
+  const DRAFT_KEY = RDO_DRAFT_KEY;
+  // The autosave effect runs in the same commit as the load effect, before the loaded
+  // values reach state. Skipping that run keeps stale fields from overwriting the draft.
+  const skipAutosaveRef = useRef(false);
+
+  const buildDraftData = () => ({
+    projectId: activeProject?.id || 1,
+    date,
+    workConditionMorning,
+    workConditionAfternoon,
+    weatherMorning,
+    weatherAfternoon,
+    ownTeamCount,
+    contractors,
+    nonConformities,
+    activities,
+    occurrences,
+    observations,
+    photos,
+    lastSavedAt: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+  });
+
+  const persistDraft = (draftData: ReturnType<typeof buildDraftData>) => {
+    if (!hasDraftContent(draftData)) {
+      localStorage.removeItem(DRAFT_KEY);
+      setHasLocalDraft(false);
+      setLastAutoSave(null);
+      return;
+    }
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      setLastAutoSave(draftData.lastSavedAt);
+    } catch {
+      // Photos are stored as base64 and can exceed the browser quota; keep the rest of the draft.
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...draftData, photos: [] }));
+        setLastAutoSave(`${draftData.lastSavedAt} · fotos não salvas no rascunho`);
+      } catch (e) {
+        console.warn(e);
+        setLastAutoSave("não foi possível salvar o rascunho");
+        return;
+      }
+    }
+    setHasLocalDraft(true);
+  };
+
+  const handleDiscardDraft = () => {
+    if (confirm("Deseja realmente limpar todos os campos e descartar o rascunho?")) {
+      localStorage.removeItem(DRAFT_KEY);
+      setHasLocalDraft(false);
+      setOwnTeamCount(0);
+      setContractors([]);
+      setNonConformities([]);
+      setActivities([
+        {
+          description: "",
+          location: "",
+          status: "em_andamento",
+          hasOvertime: false,
+          overtimeHours: "0",
+        },
+      ]);
+      setOccurrences([]);
+      setObservations("");
+      setPhotos([]);
+      setLastAutoSave(null);
+      setCurrentStep(1);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
 
     if (editData) {
       setDate(editData.date || new Date().toISOString().split("T")[0]);
-      setDayStatus(editData.dayStatus || "trabalhando");
-      setWorkCondition(editData.workCondition || "praticavel");
+      // RDOs saved before the per-shift condition only carry the day-level value
+      const legacyCondition = isDayStopped(editData) ? "impraticavel" : "praticavel";
+      setWorkConditionMorning(editData.workConditionMorning || legacyCondition);
+      setWorkConditionAfternoon(editData.workConditionAfternoon || legacyCondition);
       setWeatherMorning(editData.weatherMorning || "sol");
       setWeatherAfternoon(editData.weatherAfternoon || "sol");
       setOwnTeamCount(editData.ownTeamCount || 0);
@@ -186,19 +263,87 @@ export function RdoModal({
       setPhotos(editData.photos || []);
       setCurrentStep(1);
     } else {
-      const saved = localStorage.getItem(DRAFT_KEY);
-      if (saved && !initialDate) {
+      const draft = parseDraft(localStorage.getItem(DRAFT_KEY)) as any;
+      let resume = hasDraftContent(draft);
+      if (resume) {
+        const conflict = getDraftConflict(draft, { projectId: activeProject?.id, initialDate });
+        if (conflict !== "none") {
+          const draftProject = projects.find((p) => p.id === Number(draft.projectId));
+          const draftDate = draft.date ? draft.date.split("-").reverse().join("/") : "data não informada";
+          const origin =
+            conflict === "other_project"
+              ? `da obra "${draftProject?.name ?? "outra obra"}" (${draftDate})`
+              : `do dia ${draftDate}`;
+          resume = confirm(
+            `Existe um rascunho de RDO não salvo ${origin}.\n\n` +
+              "OK: continuar esse rascunho.\nCancelar: descartá-lo e iniciar um novo RDO."
+          );
+          if (resume && conflict === "other_project" && draftProject) {
+            setActiveProject(draftProject);
+          }
+          if (!resume) {
+            localStorage.removeItem(DRAFT_KEY);
+            setHasLocalDraft(false);
+          }
+        }
+      }
+      if (resume) {
         try {
-          const parsed = JSON.parse(saved);
+          const parsed = draft;
           setDate(parsed.date || new Date().toISOString().split("T")[0]);
-          setDayStatus(parsed.dayStatus || "trabalhando");
-          setWorkCondition(parsed.workCondition || "praticavel");
+          const legacyCondition = isDayStopped(parsed) ? "impraticavel" : "praticavel";
+          setWorkConditionMorning(parsed.workConditionMorning || legacyCondition);
+          setWorkConditionAfternoon(parsed.workConditionAfternoon || legacyCondition);
           setWeatherMorning(parsed.weatherMorning || "sol");
           setWeatherAfternoon(parsed.weatherAfternoon || "sol");
-          setOwnTeamCount(parsed.ownTeamCount ?? 8);
-          setContractors(parsed.contractors || []);
+
+          // Desconsidera mocks legados se ainda estiverem no rascunho
+          let loadedContractors = parsed.contractors || [];
+          if (
+            loadedContractors.length === 2 &&
+            loadedContractors[0]?.companyName === "EletroForte Engenharia" &&
+            loadedContractors[1]?.companyName === "HidroArte Tubulações"
+          ) {
+            loadedContractors = [];
+          }
+
+          let loadedActivities = parsed.activities || [];
+          if (
+            loadedActivities.length === 1 &&
+            loadedActivities[0]?.description === "Concretagem da laje e vigas superiores do Bloco A"
+          ) {
+            loadedActivities = [
+              {
+                description: "",
+                location: "",
+                status: "em_andamento",
+                hasOvertime: false,
+                overtimeHours: "0",
+              },
+            ];
+          }
+
+          const isLegacyMockDraft =
+            parsed.ownTeamCount === 8 &&
+            parsed.contractors?.length === 2 &&
+            parsed.contractors[0]?.companyName === "EletroForte Engenharia";
+
+          setOwnTeamCount(isLegacyMockDraft ? 0 : (parsed.ownTeamCount ?? 0));
+          setContractors(loadedContractors);
           setNonConformities(parsed.nonConformities || []);
-          setActivities(parsed.activities || []);
+          setActivities(
+            loadedActivities.length > 0
+              ? loadedActivities
+              : [
+                  {
+                    description: "",
+                    location: "",
+                    status: "em_andamento",
+                    hasOvertime: false,
+                    overtimeHours: "0",
+                  },
+                ]
+          );
           setOccurrences(parsed.occurrences || []);
           setObservations(parsed.observations || "");
           setPhotos(parsed.photos || []);
@@ -210,20 +355,17 @@ export function RdoModal({
       } else {
         // Clear all fields for a fresh RDO
         setDate(initialDate || new Date().toISOString().split("T")[0]);
-        setDayStatus("trabalhando");
-        setWorkCondition("praticavel");
+        setWorkConditionMorning("praticavel");
+        setWorkConditionAfternoon("praticavel");
         setWeatherMorning("sol");
         setWeatherAfternoon("sol");
-        setOwnTeamCount(8);
-        setContractors([
-          { companyName: "EletroForte Engenharia", trade: "Instalações Elétricas", workerCount: 3 },
-          { companyName: "HidroArte Tubulações", trade: "Instalações Hidrossanitárias", workerCount: 4 },
-        ]);
+        setOwnTeamCount(0);
+        setContractors([]);
         setNonConformities([]);
         setActivities([
           {
-            description: "Concretagem da laje e vigas superiores do Bloco A",
-            location: "Bloco A · 5º Pavimento",
+            description: "",
+            location: "",
             status: "em_andamento",
             hasOvertime: false,
             overtimeHours: "0",
@@ -236,37 +378,18 @@ export function RdoModal({
         setCurrentStep(1);
       }
     }
+    skipAutosaveRef.current = true;
   }, [isOpen, editData, initialDate]);
 
   useEffect(() => {
     if (!isOpen || editData) return;
-
-    const draftData = {
-      projectId: activeProject?.id || 1,
-      date,
-      dayStatus,
-      workCondition,
-      weatherMorning,
-      weatherAfternoon,
-      ownTeamCount,
-      contractors,
-      nonConformities,
-      activities,
-      occurrences,
-      observations,
-      photos,
-      lastSavedAt: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-    };
-
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-      setLastAutoSave(draftData.lastSavedAt);
-      setHasLocalDraft(true);
-    } catch (e) {
-      console.warn(e);
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
     }
+    persistDraft(buildDraftData());
   }, [
-    isOpen, editData, date, dayStatus, workCondition, weatherMorning, weatherAfternoon,
+    isOpen, editData, date, workConditionMorning, workConditionAfternoon, weatherMorning, weatherAfternoon,
     ownTeamCount, contractors, nonConformities, activities, occurrences, observations, photos,
   ]);
 
@@ -278,7 +401,7 @@ export function RdoModal({
   const addContractor = () => {
     setContractors([
       ...contractors,
-      { companyName: `Empreiteiro ${contractors.length + 1}`, trade: "Serviços Gerais", workerCount: 2 },
+      { companyName: "", trade: "", workerCount: 1 },
     ]);
   };
   const removeContractor = (idx: number) => setContractors(contractors.filter((_, i) => i !== idx));
@@ -328,8 +451,8 @@ export function RdoModal({
       const payload = {
         projectId: activeProject?.id || 1,
         date,
-        dayStatus,
-        workCondition,
+        workConditionMorning,
+        workConditionAfternoon,
         weatherMorning,
         weatherAfternoon,
         ownTeamCount,
@@ -361,7 +484,10 @@ export function RdoModal({
         });
       }
 
-      if (!res.ok) throw new Error("Erro ao salvar");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || "Erro ao salvar o RDO.");
+      }
 
       localStorage.removeItem(DRAFT_KEY);
       setHasLocalDraft(false);
@@ -369,16 +495,49 @@ export function RdoModal({
       onClose();
     } catch (err) {
       console.error(err);
-      alert("Erro ao salvar o RDO. Tente novamente.");
+      alert(`${err instanceof Error ? err.message : "Erro ao salvar o RDO."} Tente novamente.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const hasUnsavedContent = () => !editData && hasDraftContent(buildDraftData());
+
   const handleCancel = () => {
-    if (!editData) {
-      alert("O preenchimento foi salvo como rascunho no navegador. Você pode retomá-lo depois.");
+    if (hasUnsavedContent()) {
+      setShowAbandonModal(true);
+      return;
     }
+    onClose();
+  };
+
+  const handleSaveDraftAndClose = () => {
+    persistDraft(buildDraftData());
+    setShowAbandonModal(false);
+    onClose();
+  };
+
+  const handleDiscardAndClose = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasLocalDraft(false);
+    setOwnTeamCount(0);
+    setContractors([]);
+    setNonConformities([]);
+    setActivities([
+      {
+        description: "",
+        location: "",
+        status: "em_andamento",
+        hasOvertime: false,
+        overtimeHours: "0",
+      },
+    ]);
+    setOccurrences([]);
+    setObservations("");
+    setPhotos([]);
+    setLastAutoSave(null);
+    setCurrentStep(1);
+    setShowAbandonModal(false);
     onClose();
   };
 
@@ -405,9 +564,17 @@ export function RdoModal({
                 {editData ? "Editar RDO" : "Novo RDO"}
               </span>
               {lastAutoSave && !editData && (
-                <span className="inline-flex items-center gap-1 text-[10.5px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md font-medium">
+                <span className="inline-flex items-center gap-1.5 text-[10.5px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-medium">
                   <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
                   Rascunho · {lastAutoSave}
+                  <button
+                    type="button"
+                    onClick={handleDiscardDraft}
+                    className="ml-1 text-[10px] text-slate-400 hover:text-red-600 underline font-semibold transition"
+                    title="Descartar rascunho e limpar campos"
+                  >
+                    Limpar
+                  </button>
                 </span>
               )}
             </div>
@@ -419,9 +586,9 @@ export function RdoModal({
           <button
             onClick={handleCancel}
             className="p-2 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition"
-            title="Fechar (salva rascunho)"
+            title="Fechar"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -447,7 +614,7 @@ export function RdoModal({
                           : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                       }`}
                     >
-                      {isPast ? <Check className="w-6 h-6" strokeWidth={3} /> : step.num}
+                      {isPast ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} /> : step.num}
                     </div>
                     <span
                       className={`text-[10px] mt-1 hidden sm:block whitespace-nowrap ${
@@ -489,73 +656,46 @@ export function RdoModal({
                 />
               </div>
 
-              <div>
-                <label className={labelClass}>Status do dia</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {[
-                    { id: "trabalhando", label: "Trabalhando", desc: "Atividades normais" },
-                    { id: "nao_trabalhando", label: "Não trabalhando", desc: "Feriado / domingo" },
-                    { id: "paralisado_chuva", label: "Paralisado (chuva)", desc: "Intempérie" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setDayStatus(item.id)}
-                      className={`p-3 rounded-xl border text-left transition ${
-                        dayStatus === item.id
-                          ? "border-slate-900 bg-slate-50 shadow-sm"
-                          : "border-slate-200 hover:border-slate-300 bg-white"
-                      }`}
-                    >
-                      <div className="text-[13px] font-semibold text-slate-900">{item.label}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">{item.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className={labelClass}>Condições de trabalho</label>
-                <div className="grid grid-cols-2 gap-2 max-w-md">
-                  {[
-                    { id: "praticavel", label: "Praticável" },
-                    { id: "impraticavel", label: "Impraticável" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setWorkCondition(item.id)}
-                      className={`p-2.5 rounded-xl border text-[13px] font-semibold transition ${
-                        workCondition === item.id
-                          ? "border-slate-900 bg-slate-50"
-                          : "border-slate-200 hover:border-slate-300 bg-white"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Clima · Manhã</label>
-                  <select value={weatherMorning} onChange={(e) => setWeatherMorning(e.target.value)} className={inputClass}>
-                    <option value="sol">☀️ Sol</option>
-                    <option value="parcialmente_nublado">⛅ Parcialmente nublado</option>
-                    <option value="nublado">☁️ Nublado</option>
-                    <option value="chuva">🌧️ Chuva</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Clima · Tarde</label>
-                  <select value={weatherAfternoon} onChange={(e) => setWeatherAfternoon(e.target.value)} className={inputClass}>
-                    <option value="sol">☀️ Sol</option>
-                    <option value="parcialmente_nublado">⛅ Parcialmente nublado</option>
-                    <option value="nublado">☁️ Nublado</option>
-                    <option value="chuva">🌧️ Chuva</option>
-                  </select>
-                </div>
+                {[
+                  { label: "Manhã", weather: weatherMorning, setWeather: setWeatherMorning, condition: workConditionMorning, setCondition: setWorkConditionMorning },
+                  { label: "Tarde", weather: weatherAfternoon, setWeather: setWeatherAfternoon, condition: workConditionAfternoon, setCondition: setWorkConditionAfternoon },
+                ].map((shift) => (
+                  <div key={shift.label} className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-3">
+                    <div className="text-[12.5px] font-semibold text-slate-900">{shift.label}</div>
+                    <div>
+                      <label className={labelClass}>Clima</label>
+                      <select value={shift.weather} onChange={(e) => shift.setWeather(e.target.value)} className={inputClass}>
+                        <option value="sol">☀️ Sol</option>
+                        <option value="parcialmente_nublado">⛅ Parcialmente nublado</option>
+                        <option value="nublado">☁️ Nublado</option>
+                        <option value="chuva">🌧️ Chuva</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Condição de trabalho</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: "praticavel", label: "Praticável" },
+                          { id: "impraticavel", label: "Impraticável" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => shift.setCondition(item.id)}
+                            className={`p-2.5 rounded-xl border text-[13px] font-semibold transition ${
+                              shift.condition === item.id
+                                ? "border-slate-900 bg-slate-50 shadow-sm"
+                                : "border-slate-200 hover:border-slate-300 bg-white"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -596,70 +736,77 @@ export function RdoModal({
                   <button
                     type="button"
                     onClick={addContractor}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
                   >
-                    <Plus className="w-6 h-6" />
+                    <Plus className="w-3.5 h-3.5" />
                     Adicionar
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  {contractors.map((c, idx) => (
-                    <div key={idx} className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Empresa parceira"
-                          value={c.companyName}
-                          onChange={(e) => {
-                            const updated = [...contractors];
-                            updated[idx].companyName = e.target.value;
-                            setContractors(updated);
-                          }}
-                          list={`contractor-suggestions-${idx}`}
-                          className={inputClass}
-                        />
-                        <datalist id={`contractor-suggestions-${idx}`}>
-                          {CONTRACTOR_SUGGESTIONS.map((s, i) => <option key={i} value={s.name} />)}
-                        </datalist>
-                        <input
-                          type="text"
-                          placeholder="Especialidade"
-                          value={c.trade}
-                          onChange={(e) => {
-                            const updated = [...contractors];
-                            updated[idx].trade = e.target.value;
-                            setContractors(updated);
-                          }}
-                          className={inputClass}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-slate-500">Qtd operários:</span>
+                {contractors.length === 0 ? (
+                  <div className="p-4 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                    <p className="text-[12px] font-medium text-slate-500">Nenhum empreiteiro adicionado.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Adicionar" para incluir frentes terceirizadas.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {contractors.map((c, idx) => (
+                      <div key={idx} className="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <input
-                            type="number"
-                            min="1"
-                            value={c.workerCount}
+                            type="text"
+                            placeholder="Empresa parceira"
+                            value={c.companyName}
                             onChange={(e) => {
                               const updated = [...contractors];
-                              updated[idx].workerCount = Math.max(1, parseInt(e.target.value, 10) || 1);
+                              updated[idx].companyName = e.target.value;
                               setContractors(updated);
                             }}
-                            className="w-16 px-2.5 py-1 text-center text-[12.5px] font-semibold border border-slate-200 rounded-lg bg-white"
+                            list={`contractor-suggestions-${idx}`}
+                            className={inputClass}
+                          />
+                          <datalist id={`contractor-suggestions-${idx}`}>
+                            {CONTRACTOR_SUGGESTIONS.map((s, i) => <option key={i} value={s.name} />)}
+                          </datalist>
+                          <input
+                            type="text"
+                            placeholder="Especialidade"
+                            value={c.trade}
+                            onChange={(e) => {
+                              const updated = [...contractors];
+                              updated[idx].trade = e.target.value;
+                              setContractors(updated);
+                            }}
+                            className={inputClass}
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeContractor(idx)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 className="w-6 h-6" />
-                        </button>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500">Qtd operários:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={c.workerCount}
+                              onChange={(e) => {
+                                const updated = [...contractors];
+                                updated[idx].workerCount = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                setContractors(updated);
+                              }}
+                              className="w-16 px-2.5 py-1 text-center text-[12.5px] font-semibold border border-slate-200 rounded-lg bg-white"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeContractor(idx)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between">
@@ -688,9 +835,9 @@ export function RdoModal({
                 <button
                   type="button"
                   onClick={addNonConformity}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-3.5 h-3.5" />
                   Adicionar
                 </button>
               </div>
@@ -724,7 +871,7 @@ export function RdoModal({
                           className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                           title="Remover não conformidade"
                         >
-                          <Trash2 className="w-6 h-6" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
 
@@ -826,9 +973,9 @@ export function RdoModal({
                 <button
                   type="button"
                   onClick={addActivity}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-3.5 h-3.5" />
                   Adicionar
                 </button>
               </div>
@@ -846,7 +993,7 @@ export function RdoModal({
                           onClick={() => removeActivity(idx)}
                           className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                         >
-                          <Trash2 className="w-6 h-6" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       )}
                     </div>
@@ -931,9 +1078,9 @@ export function RdoModal({
                 <button
                   type="button"
                   onClick={addOccurrence}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-3.5 h-3.5" />
                   Adicionar
                 </button>
               </div>
@@ -955,7 +1102,7 @@ export function RdoModal({
                           onClick={() => removeOccurrence(idx)}
                           className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                         >
-                          <Trash2 className="w-6 h-6" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1103,9 +1250,9 @@ export function RdoModal({
                           <button
                             type="button"
                             onClick={() => setPhotos(photos.filter((_, i) => i !== idx))}
-                            className="text-slate-400 hover:text-red-600 text-[11px] flex items-center gap-1"
+                            className="text-slate-400 hover:text-red-600 text-[11px] flex items-center gap-1 transition"
                           >
-                            <Trash2 className="w-6 h-6" />
+                            <Trash2 className="w-3.5 h-3.5" />
                             Remover
                           </button>
                         </div>
@@ -1185,7 +1332,7 @@ export function RdoModal({
           <button
             type="button"
             onClick={handleCancel}
-            className="px-7 py-4 rounded-xl text-[14.5px] font-medium text-slate-600 hover:bg-slate-100 transition"
+            className="px-4 py-2.5 rounded-xl text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
           >
             Cancelar
           </button>
@@ -1195,9 +1342,9 @@ export function RdoModal({
               <button
                 type="button"
                 onClick={() => setCurrentStep(currentStep - 1)}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-[12.5px] font-medium text-slate-700 hover:bg-slate-100 transition"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-medium text-slate-700 hover:bg-slate-100 transition"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-4 h-4" />
                 Voltar
               </button>
             )}
@@ -1206,25 +1353,90 @@ export function RdoModal({
               <button
                 type="button"
                 onClick={() => setCurrentStep(currentStep + 1)}
-                className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-[12.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
               >
-                Avançar
-                <ChevronRight className="w-6 h-6" />
+                <span>Avançar</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleSaveRdo}
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 px-8 py-4 rounded-xl text-[14.5px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50 shadow-sm"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] disabled:opacity-50 shadow-sm"
               >
-                <Check className="w-6 h-6" strokeWidth={2.5} />
-                {isSubmitting ? "Salvando..." : "Salvar RDO"}
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" strokeWidth={2.5} />
+                    <span>Salvar RDO</span>
+                  </>
+                )}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmação ao abandonar RDO em andamento */}
+      {showAbandonModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5" strokeWidth={2} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAbandonModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition"
+                title="Continuar editando"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <h3 className="text-[16px] font-semibold text-slate-900 tracking-tight">
+                Deseja salvar o rascunho deste RDO?
+              </h3>
+              <p className="mt-1.5 text-[13px] text-slate-600 leading-relaxed">
+                Você possui informações preenchidas neste relatório. Deseja guardar o progresso no seu navegador como rascunho para continuar depois ou prefere excluir?
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAbandonModal(false)}
+                className="px-3.5 py-2 rounded-xl text-[12.5px] font-medium text-slate-600 hover:bg-slate-100 transition text-center"
+              >
+                Continuar editando
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardAndClose}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-medium text-red-600 hover:bg-red-50 border border-red-200 transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Excluir</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDraftAndClose}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition shadow-sm"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                <span>Salvar rascunho</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

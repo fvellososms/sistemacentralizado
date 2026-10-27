@@ -1,4 +1,5 @@
 import type { DayStatus } from "./types";
+import type { ShiftConditions } from "./rules";
 
 /**
  * Calculates total headcount (own team + all contractors).
@@ -27,6 +28,14 @@ export function calculateStandardHours(dayStatus: DayStatus = "trabalhando"): nu
   return 8;
 }
 
+/** Standard hours by shift: 8h with both shifts practicable, 4h with one impracticable, 0h with both. */
+export function calculateStandardHoursByShift(shifts: ShiftConditions): number {
+  const impracticable = [shifts.workConditionMorning, shifts.workConditionAfternoon].filter(
+    (c) => c === "impraticavel"
+  ).length;
+  return 8 - 4 * impracticable;
+}
+
 /**
  * Sums all overtime hours across activities flagged with hasOvertime.
  */
@@ -45,16 +54,18 @@ export function calculateTotalOvertime(
 /**
  * Computes Total HH (Homens-Hora):
  * HH = (totalWorkers * standardHours) + overtimeSum (if totalWorkers > 0)
+ * Standard hours come from the shift conditions when given, otherwise from the day status.
  * Returns formatted as a fixed decimal string (e.g. "16.0")
  */
-export function calculateTotalHh(params: {
+export function calculateTotalHh(params: ShiftConditions & {
   dayStatus?: DayStatus;
   ownTeamCount?: number | string;
   contractors?: Array<{ workerCount?: number | string }>;
   activities?: Array<{ hasOvertime?: boolean; overtimeHours?: number | string }>;
 }): string {
   const totalWorkers = calculateTotalWorkers(params.ownTeamCount, params.contractors);
-  const standardHours = calculateStandardHours(params.dayStatus);
+  const hasShifts = params.workConditionMorning != null || params.workConditionAfternoon != null;
+  const standardHours = hasShifts ? calculateStandardHoursByShift(params) : calculateStandardHours(params.dayStatus);
   const overtimeSum = calculateTotalOvertime(params.activities);
 
   const totalHhNum = totalWorkers * standardHours + (totalWorkers > 0 ? overtimeSum : 0);

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import logo from "@/assets/images/logofvelloso.png";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,19 +15,41 @@ import {
   LogOut,
   Plus,
   Hexagon,
+  ChevronDown,
 } from "lucide-react";
+
+type NavChild = { label: string; href: string };
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  subtitle?: string;
+  children?: NavChild[];
+};
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { profile, openCreateModal, activeProject } = useApp();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "RDO", href: "/rdo", icon: FileSpreadsheet, subtitle: "Diário de obra" },
     { label: "APR", href: "/apr", icon: AlertTriangle, subtitle: "Análise de riscos" },
     { label: "RSO", href: "/rso", icon: CalendarDays, subtitle: "Relatório semanal" },
-    { label: "Qualidade", href: "/dashboard/qualidade", icon: ShieldCheck },
+    {
+      label: "Qualidade",
+      href: "/dashboard/qualidade",
+      icon: ShieldCheck,
+      children: [
+        { label: "Visão geral", href: "/dashboard/qualidade" },
+        { label: "Não conformidades", href: "/dashboard/qualidade/nao-conformidades" },
+        { label: "Checklist Equipamentos", href: "/dashboard/qualidade/checklist-equipamentos" },
+        { label: "Checklist EPI", href: "/dashboard/qualidade/checklist-epi" },
+        { label: "Inspeções programadas", href: "/dashboard/qualidade/inspecoes" },
+      ],
+    },
     { label: "Perfil", href: "/perfil", icon: User },
   ];
 
@@ -82,9 +104,6 @@ export function Sidebar() {
               <div className="font-medium text-[13px] text-white truncate group-hover:text-blue-300 transition">
                 {profile?.name || "Alberto Martins"}
               </div>
-              <div className="text-[11px] text-slate-400 truncate font-medium">
-                {profile?.role || "Encarregado Geral"}
-              </div>
             </div>
           </div>
         </Link>
@@ -98,23 +117,68 @@ export function Sidebar() {
         <div className="space-y-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href === "/dashboard" && pathname === "/dashboard");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all ${
-                  isActive
-                    ? "bg-white text-slate-900 shadow-sm shadow-white/5"
-                    : "text-slate-300 hover:text-white hover:bg-white/5"
+            const isInGroup = !!item.children && pathname.startsWith(item.href);
+            const isActive = item.children ? isInGroup : pathname === item.href;
+            const isOpen = openGroups[item.href] ?? isInGroup;
+            const itemClass = `group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all ${
+              isActive && !item.children
+                ? "bg-white text-slate-900 shadow-sm shadow-white/5"
+                : isActive
+                  ? "text-white bg-white/5"
+                  : "text-slate-300 hover:text-white hover:bg-white/5"
+            }`;
+            const icon = (
+              <Icon
+                className={`w-[18px] h-[18px] shrink-0 transition ${
+                  isActive ? (item.children ? "text-blue-400" : "text-blue-600") : "text-slate-400 group-hover:text-slate-200"
                 }`}
-              >
-                <Icon
-                  className={`w-[18px] h-[18px] shrink-0 transition ${
-                    isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-200"
-                  }`}
-                  strokeWidth={isActive ? 2.2 : 1.7}
-                />
+                strokeWidth={isActive ? 2.2 : 1.7}
+              />
+            );
+
+            if (item.children) {
+              return (
+                <div key={item.href}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroups((g) => ({ ...g, [item.href]: !isOpen }))}
+                    aria-expanded={isOpen}
+                    className={itemClass}
+                  >
+                    {icon}
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="mt-0.5 ml-[21px] pl-3 border-l border-white/10 space-y-0.5">
+                      {item.children.map((child) => {
+                        const isChildActive = pathname === child.href;
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`block px-3 py-2 rounded-lg text-[12.5px] font-medium transition ${
+                              isChildActive
+                                ? "bg-white text-slate-900 shadow-sm shadow-white/5"
+                                : "text-slate-400 hover:text-white hover:bg-white/5"
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <Link key={item.href} href={item.href} className={itemClass}>
+                {icon}
                 <span className="flex-1">{item.label}</span>
                 {item.subtitle && !isActive && (
                   <span className="text-[10px] text-slate-500 font-medium">
@@ -129,24 +193,11 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-3 border-t border-white/5 space-y-2">
-        {activeProject && (
-          <div className="px-3 py-2.5 rounded-xl bg-white/5 border border-white/5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              Obra ativa
-            </div>
-            <div className="text-[12px] font-medium text-white truncate mt-0.5">
-              {activeProject.name}
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-              {activeProject.code}
-            </div>
-          </div>
-        )}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-8 py-4 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-white/5 transition text-[14.5px] font-medium"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-white/5 transition text-[13.5px] font-medium"
         >
-          <LogOut className="w-6 h-6" strokeWidth={1.8} />
+          <LogOut className="w-[18px] h-[18px] shrink-0" strokeWidth={1.8} />
           <span>Sair da conta</span>
         </button>
       </div>

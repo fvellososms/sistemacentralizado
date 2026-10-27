@@ -5,7 +5,7 @@ import { formatarData } from "@/lib/apr/format";
 import { EmptyState } from "@/components/ui";
 import { listarAprs } from "@/lib/apr/repo";
 import { STATUS_LABEL, type AprStatus } from "@/lib/apr/types";
-import { getObraAtual, listarObras, getUsuarioAtual } from "@/db/session";
+import { getObraAtual, getUsuarioAtual } from "@/db/session";
 import { NovaAprButton } from "@/components/apr/NovaAprButton";
 import type { AprDraft } from "@/lib/apr/types";
 
@@ -21,7 +21,6 @@ export default async function AprListaPage({
   const sp = await searchParams;
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const obraAtual = await getObraAtual();
-  const obras = await listarObras();
   const usuario = await getUsuarioAtual();
 
   const inicial: AprDraft = {
@@ -39,11 +38,12 @@ export default async function AprListaPage({
     atividades: [],
   };
 
-  const obraParam = get("obraId");
-  const obraId = obraParam === "todas" ? undefined : obraParam ? Number(obraParam) : obraAtual?.id;
   const status = STATUS.includes(get("status") as AprStatus) ? (get("status") as AprStatus) : undefined;
 
-  const itens = await listarAprs({ obraId, status, atividade: get("atividade"), de: get("de"), ate: get("ate"), q: get("q") });
+  // A lista mostra apenas as APRs da obra ativa no cabeçalho.
+  const itens = obraAtual
+    ? await listarAprs({ obraId: obraAtual.id, status, atividade: get("atividade"), de: get("de"), ate: get("ate"), q: get("q") })
+    : [];
 
   const resumo = STATUS.map((s) => ({ s, n: itens.filter((i) => i.status === s).length }));
 
@@ -64,7 +64,7 @@ export default async function AprListaPage({
       {/* Resumo por situação */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         {resumo.map(({ s, n }) => (
-          <Link key={s} href={`/apr?status=${s}${obraParam ? `&obraId=${obraParam}` : ""}`} className={`bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden p-4 transition-colors hover:bg-slate-50 ${status === s ? "ring-2 ring-slate-400" : ""}`}>
+          <Link key={s} href={`/apr?status=${s}`} className={`bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden p-4 transition-colors hover:bg-slate-50 ${status === s ? "ring-2 ring-slate-400" : ""}`}>
             <p className="text-xs text-slate-500">{STATUS_LABEL[s]}</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{n}</p>
           </Link>
@@ -73,18 +73,9 @@ export default async function AprListaPage({
 
       {/* Filtros */}
       <form method="get" className="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden mb-5 grid grid-cols-1 gap-3 p-4 md:grid-cols-6">
-        <div className="md:col-span-2">
+        <div className="md:col-span-3">
           <label htmlFor="q" className="block text-sm font-medium mb-1 text-slate-700">Buscar</label>
           <input id="q" name="q" defaultValue={get("q") ?? ""} placeholder="Código, local ou descrição" className="border border-slate-300 rounded p-2 w-full focus:ring-2 focus:ring-slate-900 focus:outline-none text-[13px]" />
-        </div>
-        <div>
-          <label htmlFor="obraId" className="block text-sm font-medium mb-1 text-slate-700">Obra</label>
-          <select id="obraId" name="obraId" defaultValue={obraParam ?? obraAtual?.id ?? "todas"} className="border border-slate-300 rounded p-2 w-full focus:ring-2 focus:ring-slate-900 focus:outline-none text-[13px]">
-            <option value="todas">Todas</option>
-            {obras.map((o) => (
-              <option key={o.id} value={o.id}>{o.codigo} · {o.nome}</option>
-            ))}
-          </select>
         </div>
         <div>
           <label htmlFor="status" className="block text-sm font-medium mb-1 text-slate-700">Situação</label>
@@ -110,7 +101,7 @@ export default async function AprListaPage({
           </div>
         </div>
         <div className="flex gap-2 md:col-span-6 md:justify-end">
-          <Link href="/apr?obraId=todas" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">Limpar</Link>
+          <Link href="/apr" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">Limpar</Link>
           <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition">Aplicar filtros</button>
         </div>
       </form>
@@ -134,7 +125,7 @@ export default async function AprListaPage({
                   </div>
                   <p className="mt-2 line-clamp-2 text-sm font-medium text-slate-800">{i.descricaoServico}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {i.obraCodigo} · {i.localObra}
+                    {i.localObra}
                   </p>
                   <p className="mt-2 text-xs text-slate-800-secondary">
                     {i.qtdAtividades} atividade(s) · {i.qtdRiscos} risco(s) · execução {formatarData(i.dataExecucao)}
@@ -151,7 +142,7 @@ export default async function AprListaPage({
                 <tr>
                   <th className="px-4 py-3 font-medium">Código</th>
                   <th className="px-4 py-3 font-medium">Serviço</th>
-                  <th className="px-4 py-3 font-medium">Obra / local</th>
+                  <th className="px-4 py-3 font-medium">Local</th>
                   <th className="px-4 py-3 font-medium">Itens</th>
                   <th className="px-4 py-3 font-medium">Execução</th>
                   <th className="px-4 py-3 font-medium">Situação</th>
@@ -169,7 +160,6 @@ export default async function AprListaPage({
                       <span className="text-xs text-slate-500">por {i.autor ?? "—"}</span>
                     </td>
                     <td className="px-4 py-3 text-slate-800-secondary">
-                      <span className="block text-xs text-slate-500">{i.obraCodigo} · {i.obraNome}</span>
                       {i.localObra}
                     </td>
                     <td className="px-4 py-3 text-slate-800-secondary">{i.qtdAtividades} atv · {i.qtdRiscos} riscos</td>

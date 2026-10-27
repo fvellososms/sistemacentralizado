@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import {
+  projects,
   rdos,
   rdoContractors,
   rdoActivities,
@@ -8,6 +9,7 @@ import {
   rdoPhotos,
 } from "@/db/schema";
 import { eq, desc, and, like } from "drizzle-orm";
+import { STATIC_PROJECTS } from "@/modules/projects";
 import type { CreateRdoInput } from "../domain/types";
 
 export interface RdoRepository {
@@ -40,6 +42,8 @@ export class DrizzleRdoRepository implements RdoRepository {
           dayOfWeek: rdos.dayOfWeek,
           dayStatus: rdos.dayStatus,
           workCondition: rdos.workCondition,
+          workConditionMorning: rdos.workConditionMorning,
+          workConditionAfternoon: rdos.workConditionAfternoon,
           weatherMorning: rdos.weatherMorning,
           weatherAfternoon: rdos.weatherAfternoon,
           ownTeamCount: rdos.ownTeamCount,
@@ -73,11 +77,12 @@ export class DrizzleRdoRepository implements RdoRepository {
 
       const fullItems = await Promise.all(
         rdoList.map(async (rdo) => {
-          const [acts, occs, contractors, photosList] = await Promise.all([
+          const [acts, occs, contractors, photosList, nonConfs] = await Promise.all([
             db.select().from(rdoActivities).where(eq(rdoActivities.rdoId, rdo.id)),
             db.select().from(rdoOccurrences).where(eq(rdoOccurrences.rdoId, rdo.id)),
             db.select().from(rdoContractors).where(eq(rdoContractors.rdoId, rdo.id)),
             db.select().from(rdoPhotos).where(eq(rdoPhotos.rdoId, rdo.id)),
+            db.select().from(rdoNonConformities).where(eq(rdoNonConformities.rdoId, rdo.id)),
           ]);
 
           return {
@@ -86,6 +91,7 @@ export class DrizzleRdoRepository implements RdoRepository {
             activitiesSummary: acts.map((a) => a.description).join("; "),
             contractorsList: contractors,
             occurrencesCount: occs.length,
+            nonConformitiesList: nonConfs,
             photosCount: photosList.length,
             photosPreview: photosList.slice(0, 3).map((p) => p.photoUrl),
           };
@@ -155,6 +161,30 @@ export class DrizzleRdoRepository implements RdoRepository {
     const occurrences = Array.isArray(data.occurrences) ? data.occurrences : [];
     const hasOccurrences = occurrences.length > 0 || Boolean(data.hasOccurrences);
 
+    const existingProject = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, data.projectId))
+      .limit(1);
+
+    if (existingProject.length === 0) {
+      const staticMatch =
+        STATIC_PROJECTS.find((p) => p.id === data.projectId) ?? STATIC_PROJECTS[0];
+      await db
+        .insert(projects)
+        .values({
+          id: data.projectId,
+          name: staticMatch.name,
+          code: staticMatch.code,
+          companyName: staticMatch.companyName,
+          address: staticMatch.address,
+          managerName: staticMatch.managerName,
+          status: staticMatch.status,
+          startDate: staticMatch.startDate,
+        })
+        .onConflictDoNothing();
+    }
+
     // Insert main RDO
     const [newRdo] = await db
       .insert(rdos)
@@ -165,6 +195,8 @@ export class DrizzleRdoRepository implements RdoRepository {
         dayOfWeek: data.dayOfWeek,
         dayStatus: data.dayStatus || "trabalhando",
         workCondition: data.workCondition || "praticavel",
+        workConditionMorning: data.workConditionMorning || "praticavel",
+        workConditionAfternoon: data.workConditionAfternoon || "praticavel",
         weatherMorning: data.weatherMorning || "sol",
         weatherAfternoon: data.weatherAfternoon || "sol",
         ownTeamCount: data.ownTeamCount,

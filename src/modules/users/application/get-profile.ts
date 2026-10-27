@@ -11,7 +11,7 @@ export async function getProfile(): Promise<UserProfile> {
         .insert(userProfiles)
         .values({
           ...DEFAULT_PROFILE,
-          passwordHash: "123456",
+          passwordHash: "senha12345678",
         })
         .returning();
       return newProfile as UserProfile;

@@ -9,7 +9,7 @@ import {
   FileSpreadsheet,
   Plus,
   CalendarDays,
-  User,
+  AlertTriangle,
 } from "lucide-react";
 
 export function BottomNav() {
@@ -79,16 +79,16 @@ export function BottomNav() {
         </Link>
 
         <Link
-          href="/perfil"
+          href="/apr"
           className={`flex flex-col items-center justify-center w-14 py-1.5 rounded-2xl transition ${
-            pathname === "/perfil" ? "text-white" : "text-slate-400 hover:text-white"
+            pathname.startsWith("/apr") ? "text-white" : "text-slate-400 hover:text-white"
           }`}
         >
-          <User
+          <AlertTriangle
             className="w-[20px] h-[20px]"
-            strokeWidth={pathname === "/perfil" ? 2.2 : 1.7}
+            strokeWidth={pathname.startsWith("/apr") ? 2.2 : 1.7}
           />
-          <span className="text-[10px] mt-0.5 font-medium">Perfil</span>
+          <span className="text-[10px] mt-0.5 font-medium">APR</span>
         </Link>
       </div>
     </nav>

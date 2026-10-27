@@ -106,7 +106,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (draft) {
         try {
           const parsed = JSON.parse(draft);
-          if (parsed && (parsed.activities?.length || parsed.contractors?.length || parsed.observations)) {
+          const hasContent =
+            Boolean(parsed.observations?.trim()) ||
+            (Array.isArray(parsed.contractors) && parsed.contractors.some((c: any) => c.companyName?.trim())) ||
+            (Array.isArray(parsed.activities) && parsed.activities.some((a: any) => a.description?.trim())) ||
+            (Array.isArray(parsed.photos) && parsed.photos.length > 0) ||
+            (Array.isArray(parsed.nonConformities) && parsed.nonConformities.length > 0) ||
+            (Array.isArray(parsed.occurrences) && parsed.occurrences.length > 0);
+
+          if (parsed && hasContent) {
             setHasLocalDraft(true);
           }
         } catch {

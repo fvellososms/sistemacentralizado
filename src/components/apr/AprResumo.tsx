@@ -47,10 +47,6 @@ export function AprResumo({
             <dd className="font-medium text-slate-800">{draft.localObra || "—"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Responsável</dt>
-            <dd className="font-medium text-slate-800">{draft.responsavel || "—"}</dd>
-          </div>
-          <div>
             <dt className="text-xs text-slate-500">Data de execução</dt>
             <dd className="text-[11px] font-mono text-slate-400 text-slate-800">{formatarData(draft.dataExecucao)}</dd>
           </div>

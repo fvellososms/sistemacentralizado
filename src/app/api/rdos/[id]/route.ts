@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { rdos, rdoContractors, rdoActivities, rdoNonConformities, rdoOccurrences, rdoPhotos, projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { deleteRdo } from "@/modules/rdo/server";
+import { resolveDayConditions } from "@/modules/rdo";
 import { AppError } from "@/shared/errors/AppError";
 
 interface RouteParams {
@@ -81,6 +82,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
     }
 
     const totalHeadcount = ownCount + contractorCount;
+    const hasShifts = body.workConditionMorning !== undefined || body.workConditionAfternoon !== undefined;
+    const conditions = hasShifts
+      ? resolveDayConditions({
+          workConditionMorning: body.workConditionMorning ?? existing.workConditionMorning,
+          workConditionAfternoon: body.workConditionAfternoon ?? existing.workConditionAfternoon,
+        })
+      : {};
 
     // Update main RDO
     const [updated] = await db
@@ -90,6 +98,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         workCondition: body.workCondition ?? existing.workCondition,
         weatherMorning: body.weatherMorning ?? existing.weatherMorning,
         weatherAfternoon: body.weatherAfternoon ?? existing.weatherAfternoon,
+        ...conditions,
         ownTeamCount: ownCount,
         contractorTeamCount: contractorCount,
         totalHeadcount,

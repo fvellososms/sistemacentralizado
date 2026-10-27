@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { PhotoCard, PhotoData } from "./PhotoCard";
 import { ConfirmModal } from "./ConfirmModal";
+import { isDayStopped } from "@/modules/rdo";
 
 interface RdoDetailModalProps {
   rdoId: number | null;
@@ -91,11 +92,11 @@ export function RdoDetailModal({
   };
 
   const getStatusBadge = () => {
-    if (data?.dayStatus === "paralisado_chuva") {
+    if (isDayStopped(data)) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-100">
           <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-          Paralisado (chuva)
+          Paralisado
         </span>
       );
     }
@@ -142,7 +143,7 @@ export function RdoDetailModal({
               className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
               title="Imprimir"
             >
-              <Printer className="w-6 h-6" strokeWidth={1.8} />
+              <Printer className="w-4 h-4" strokeWidth={1.8} />
             </button>
             {onEdit && (
               <button
@@ -153,7 +154,7 @@ export function RdoDetailModal({
                 className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
                 title="Editar"
               >
-                <Edit3 className="w-6 h-6" strokeWidth={1.8} />
+                <Edit3 className="w-4 h-4" strokeWidth={1.8} />
               </button>
             )}
             <button
@@ -161,7 +162,7 @@ export function RdoDetailModal({
               className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
               title="Fechar"
             >
-              <X className="w-6 h-6" strokeWidth={1.8} />
+              <X className="w-4 h-4" strokeWidth={1.8} />
             </button>
           </div>
         </div>
@@ -193,6 +194,11 @@ export function RdoDetailModal({
                 <div className="text-[13px] font-semibold text-slate-900 mt-1">
                   {getWeatherLabel(data.weatherMorning)}
                 </div>
+                {data.workConditionMorning && (
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {data.workConditionMorning === "impraticavel" ? "Impraticável" : "Praticável"}
+                  </div>
+                )}
               </div>
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -201,6 +207,11 @@ export function RdoDetailModal({
                 <div className="text-[13px] font-semibold text-slate-900 mt-1">
                   {getWeatherLabel(data.weatherAfternoon)}
                 </div>
+                {data.workConditionAfternoon && (
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {data.workConditionAfternoon === "impraticavel" ? "Impraticável" : "Praticável"}
+                  </div>
+                )}
               </div>
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -428,7 +439,7 @@ export function RdoDetailModal({
               }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition shadow-sm"
             >
-              <Edit3 className="w-6 h-6" />
+              <Edit3 className="w-4 h-4" />
               <span>Editar RDO</span>
             </button>
           )}

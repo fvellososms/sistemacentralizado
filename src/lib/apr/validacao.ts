@@ -1,4 +1,5 @@
 import type { AprDraft } from "./types";
+import { isAtividadeDuplicada } from "@/modules/apr/domain/activities";
 
 export type Erros = Record<string, string>;
 
@@ -7,13 +8,14 @@ export function validarDraft(d: AprDraft, ateEtapa: number): Erros {
   const e: Erros = {};
   if (ateEtapa >= 1) {
     if (!d.localObra?.trim()) e.localObra = "Informe o local ou frente de serviço.";
-    if (!d.responsavel?.trim()) e.responsavel = "Informe o responsável pela execução.";
     if (!d.dataExecucao) e.dataExecucao = "Informe a data prevista de execução.";
     if (!d.descricaoServico?.trim()) e.descricaoServico = "Descreva a atividade a ser executada.";
     else if (d.descricaoServico.trim().length < 10) e.descricaoServico = "Descreva com um pouco mais de detalhe (mínimo 10 caracteres).";
   }
   if (ateEtapa >= 2) {
     if (d.atividades.length === 0) e.atividades = "Selecione ou adicione ao menos uma atividade.";
+    const duplicada = d.atividades.find((a, i) => isAtividadeDuplicada(d.atividades.slice(0, i), a));
+    if (duplicada) e.atividades = `A atividade “${duplicada.nome}” aparece mais de uma vez. Remova a repetida.`;
     for (const a of d.atividades) {
       const pend = a.riscos.filter((r) => !r.revisado);
       if (pend.length) e[`riscos_${a.key}`] = `${pend.length} risco(s) aguardando sua avaliação.`;

@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
     "seed": "node --experimental-strip-types src/db/seed.ts",
-    "seed:apr": "node --experimental-strip-types src/db/seed-apr.ts",
+    "seed:apr": "tsx --env-file=.env.local src/db/seed-apr.ts",
     "seed:projects": "node --experimental-strip-types scripts/seed/add_projects.ts"
   },
   "dependencies": {

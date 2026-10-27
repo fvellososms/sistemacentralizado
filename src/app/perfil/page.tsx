@@ -341,18 +341,18 @@ export default function PerfilPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center justify-center gap-1.5 px-8 py-4 rounded-xl text-[14.5px] font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition self-start"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition self-start"
             >
-              <LogOut className="w-6 h-6" strokeWidth={1.8} />
+              <LogOut className="w-4 h-4" strokeWidth={1.8} />
               <span>Sair da conta</span>
             </button>
 
             <button
               type="submit"
               disabled={isSaving}
-              className="flex items-center justify-center gap-1.5 px-7 py-4.5 rounded-xl text-[14.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] disabled:opacity-50 shadow-sm"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] disabled:opacity-50 shadow-sm"
             >
-              <Save className="w-6 h-6" strokeWidth={1.8} />
+              <Save className="w-4 h-4" strokeWidth={1.8} />
               <span>{isSaving ? "Salvando..." : "Salvar alterações"}</span>
             </button>
           </div>

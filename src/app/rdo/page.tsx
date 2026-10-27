@@ -25,6 +25,7 @@ import {
 import { RdoDetailModal } from "@/components/RdoDetailModal";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { RdoModal } from "@/components/RdoModal";
+import { isDayStopped } from "@/modules/rdo";
 
 function RdoContent() {
   const searchParams = useSearchParams();
@@ -132,7 +133,8 @@ function RdoContent() {
         dayOfWeek: draftMetadata.dayOfWeek || "Seg",
         totalHh: "---",
         activitiesSummary: draftMetadata.activities?.length ? draftMetadata.activities[0].description : "Rascunho não finalizado...",
-        dayStatus: draftMetadata.dayStatus || "trabalhando",
+        workConditionMorning: draftMetadata.workConditionMorning,
+        workConditionAfternoon: draftMetadata.workConditionAfternoon,
         hasOccurrences: false,
         totalHeadcount: "---",
         ownTeamCount: draftMetadata.ownTeamCount || 0,
@@ -262,7 +264,7 @@ function RdoContent() {
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    <Icon className="w-6 h-6" strokeWidth={2} />
+                    <Icon className="w-4 h-4" strokeWidth={2} />
                     <span className="hidden sm:inline">{v.label}</span>
                   </button>
                 );
@@ -273,7 +275,7 @@ function RdoContent() {
               onClick={() => openCreateModal()}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
             >
-              <Plus className="w-6 h-6" strokeWidth={2.2} />
+              <Plus className="w-4 h-4" strokeWidth={2.2} />
               <span className="hidden sm:inline">Criar RDO</span>
             </button>
           </div>
@@ -340,7 +342,7 @@ function RdoContent() {
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                               Rascunho
                             </span>
-                          ) : rdo.dayStatus === "paralisado_chuva" ? (
+                          ) : isDayStopped(rdo) ? (
 
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-red-50 text-red-700 border border-red-100">
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
@@ -404,14 +406,14 @@ function RdoContent() {
                           className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
                           title="Ver detalhes"
                         >
-                          <Eye className="w-6 h-6" strokeWidth={1.8} />
+                          <Eye className="w-4 h-4" strokeWidth={1.8} />
                         </button>
                         <button
                           onClick={() => handlePrintSingle(rdo.id)}
                           className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
                           title="Imprimir"
                         >
-                          <Printer className="w-6 h-6" strokeWidth={1.8} />
+                          <Printer className="w-4 h-4" strokeWidth={1.8} />
                         </button>
                         <button
                           onClick={() => {
@@ -424,13 +426,13 @@ function RdoContent() {
                           className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
                           title="Editar"
                         >
-                          <Edit3 className="w-6 h-6" strokeWidth={1.8} />
+                          <Edit3 className="w-4 h-4" strokeWidth={1.8} />
                         </button>
                         <button
                           onClick={() => setRdoToDelete(rdo)}
                           className="p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
                           title="Excluir">
-                          <Trash2 className="w-6 h-6" strokeWidth={1.8} />
+                          <Trash2 className="w-4 h-4" strokeWidth={1.8} />
                         </button>
                           </>
                         )}
@@ -457,7 +459,7 @@ function RdoContent() {
                     onClick={() => setCalendarDate(new Date(year, month - 1, 1))}
                     className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition"
                   >
-                    <ChevronLeft className="w-6 h-6" />
+                    <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setCalendarDate(new Date())}
@@ -469,7 +471,7 @@ function RdoContent() {
                     onClick={() => setCalendarDate(new Date(year, month + 1, 1))}
                     className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition"
                   >
-                    <ChevronRight className="w-6 h-6" />
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -497,7 +499,7 @@ function RdoContent() {
                   let dotClass = "bg-slate-300";
 
                   if (rdoForDay) {
-                    if (rdoForDay.dayStatus === "paralisado_chuva") {
+                    if (isDayStopped(rdoForDay)) {
                       bgClass = "bg-red-50/70 hover:bg-red-50 border-red-100";
                       textClass = "text-red-900";
                       dotClass = "bg-red-500";

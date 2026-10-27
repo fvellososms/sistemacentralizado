@@ -34,7 +34,9 @@ export const rdos = pgTable("rdos", {
   date: varchar("date", { length: 20 }).notNull(), // YYYY-MM-DD
   dayOfWeek: varchar("day_of_week", { length: 20 }), // qui, sex, etc.
   dayStatus: varchar("day_status", { length: 50 }).notNull().default("trabalhando"), // trabalhando, nao_trabalhando, paralisado_chuva
-  workCondition: varchar("work_condition", { length: 50 }).notNull().default("praticavel"), // praticavel, impraticavel
+  workCondition: varchar("work_condition", { length: 50 }).notNull().default("praticavel"), // derived: impraticavel if any shift is
+  workConditionMorning: varchar("work_condition_morning", { length: 50 }).notNull().default("praticavel"), // praticavel, impraticavel
+  workConditionAfternoon: varchar("work_condition_afternoon", { length: 50 }).notNull().default("praticavel"), // praticavel, impraticavel
   weatherMorning: varchar("weather_morning", { length: 50 }).notNull().default("sol"), // sol, parcialmente_nublado, nublado, chuva
   weatherAfternoon: varchar("weather_afternoon", { length: 50 }).notNull().default("sol"), // sol, parcialmente_nublado, nublado, chuva
   ownTeamCount: integer("own_team_count").notNull().default(0),
@@ -308,3 +310,27 @@ export const aprControle = pgTable("apr_controle", {
 
 // ---------------------------------------------------------------------------
 // Enums
+
+// ---------------------------------------------------------------------------
+// Qualidade — Não conformidades
+// ---------------------------------------------------------------------------
+export const naoConformidades = pgTable("nao_conformidades", {
+  id: serial("id").primaryKey(),
+  // No FK: the active project may come from STATIC_PROJECTS; the name is kept as a snapshot.
+  projectId: integer("project_id").notNull(),
+  projectName: varchar("project_name", { length: 255 }),
+  tipo: varchar("tipo", { length: 30 }).notNull(), // sst, qualidade, ambiental, documental
+  grau: varchar("grau", { length: 20 }).notNull(), // baixa, media, grave
+  dataOcorrencia: varchar("data_ocorrencia", { length: 20 }).notNull(), // YYYY-MM-DD
+  localObra: text("local_obra").notNull(),
+  requisitoViolado: text("requisito_violado").notNull(),
+  titulo: varchar("titulo", { length: 255 }).notNull(),
+  descricao: text("descricao").notNull(),
+  responsavelNome: varchar("responsavel_nome", { length: 255 }).notNull(),
+  responsavelEmail: varchar("responsavel_email", { length: 255 }).notNull(),
+  prazo: varchar("prazo", { length: 20 }).notNull(), // YYYY-MM-DD
+  status: varchar("status", { length: 20 }).notNull().default("aberta"), // aberta, resolvida
+  resolvidaEm: timestamp("resolvida_em"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

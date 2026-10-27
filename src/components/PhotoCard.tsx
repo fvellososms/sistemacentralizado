@@ -84,7 +84,7 @@ export function PhotoCard({ photo, onDelete, canDelete = true }: PhotoCardProps)
               className="p-2 rounded-lg bg-white/95 text-slate-900 hover:bg-white transition shadow"
               title="Visualizar"
             >
-              <Eye className="w-6 h-6" />
+              <Eye className="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -92,7 +92,7 @@ export function PhotoCard({ photo, onDelete, canDelete = true }: PhotoCardProps)
               className="p-2 rounded-lg bg-white/95 text-slate-900 hover:bg-white transition shadow"
               title="Baixar"
             >
-              <Download className="w-6 h-6" />
+              <Download className="w-4 h-4" />
             </button>
             {canDelete && onDelete && (
               <button
@@ -101,7 +101,7 @@ export function PhotoCard({ photo, onDelete, canDelete = true }: PhotoCardProps)
                 className="p-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition shadow"
                 title="Excluir"
               >
-                <Trash2 className="w-6 h-6" />
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>

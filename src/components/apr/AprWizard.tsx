@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { X, ChevronLeft } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Badge, Button, ConfirmDialog, Spinner, useToast } from "@/components/ui";
 import { AprResumo } from "./AprResumo";
 import { AprStatusBadge, RelevanciaBadge, StepIndicator } from "./shared";
 import { riscoBaseParaDraft, StepAtividadesRiscos, StepIdentificacao, StepMedidas } from "./Steps";
 import { validarDraft, type Erros } from "@/lib/apr/validacao";
+import { adicionarAtividadesSemDuplicar, isAtividadeDuplicada } from "@/modules/apr/domain/activities";
 import { novaKey, type AprDraft, type BuscaResposta, type RiscoBase, type SugestaoAtividade } from "@/lib/apr/types";
 
 type EstadoAssistente = "aguardando" | "pesquisando" | "sugestoes" | "vazio" | "erro" | "revisado";
@@ -37,6 +38,8 @@ export function AprWizard({
   const [enviando, setEnviando] = useState(false);
   const [confirmEnvio, setConfirmEnvio] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
+  // Motivos que impediram o avanço da etapa, exibidos no topo para o usuário não ficar sem resposta.
+  const [pendenciasEtapa, setPendenciasEtapa] = useState<string[]>([]);
   const [assistenteAberto, setAssistenteAberto] = useState(true);
 
   // Assistente
@@ -100,10 +103,7 @@ export function AprWizard({
           if (validos.length > 0) {
             atualizar((d) => ({
               ...d,
-              atividades: [
-                ...d.atividades,
-                ...validos.filter((v) => !d.atividades.some((existing) => existing.atividadeOrigemId === v.atividadeOrigemId)),
-              ],
+              atividades: adicionarAtividadesSemDuplicar(d.atividades, validos),
             }));
             toast.push(
               `${validos.length} atividade(s) de alta relevância pré-selecionada(s) automaticamente para revisão.`,
@@ -145,34 +145,42 @@ export function AprWizard({
   // ---------------------------------------------------------------------
   // Atividades
   // ---------------------------------------------------------------------
+  // Atividades cujos riscos ainda estão sendo carregados: evita que um segundo clique
+  // durante o carregamento adicione a mesma atividade de novo.
+  const carregandoAtividades = useRef(new Set<number>());
+
   const adicionarAtividadeBase = useCallback(
     async (id: number, nome: string, categoria: string | null, relevancia?: SugestaoAtividade["relevancia"]) => {
-      if (draft.atividades.some((a) => a.atividadeOrigemId === id)) return;
+      if (carregandoAtividades.current.has(id)) return;
+      if (isAtividadeDuplicada(draftRef.current.atividades, { atividadeOrigemId: id, nome })) {
+        toast.push(`A atividade “${nome}” já está nesta APR.`, "warning");
+        return;
+      }
+      carregandoAtividades.current.add(id);
       try {
         const res = await fetch(`/api/apr/atividades/${id}/riscos`);
         if (!res.ok) throw new Error();
         const data = (await res.json()) as { riscos: RiscoBase[] };
-        atualizar((d) => ({
-          ...d,
-          atividades: [
-            ...d.atividades,
-            { key: novaKey("a"), nome, categoria, atividadeOrigemId: id, origem: "base", relevancia, riscos: data.riscos.map(riscoBaseParaDraft) },
-          ],
-        }));
-        toast.push(`Atividade “${nome}” adicionada com ${data.riscos.length} risco(s) para revisão.`, "success");
+        const nova = { key: novaKey("a"), nome, categoria, atividadeOrigemId: id, origem: "base" as const, relevancia, riscos: data.riscos.map(riscoBaseParaDraft) };
+        atualizar((d) => ({ ...d, atividades: adicionarAtividadesSemDuplicar(d.atividades, [nova]) }));
+        toast.push(`Atividade “${nome}” adicionada com ${data.riscos.length} risco(s). Marque os que se aplicam.`, "success");
       } catch {
         toast.push("Não foi possível carregar os riscos da atividade. Tente novamente.", "danger");
+      } finally {
+        carregandoAtividades.current.delete(id);
       }
     },
-    [draft.atividades, atualizar, toast],
+    [atualizar, toast],
   );
 
   const adicionarAtividadeManual = useCallback(
     (nome: string) => {
-      atualizar((d) => ({
-        ...d,
-        atividades: [...d.atividades, { key: novaKey("a"), nome, categoria: null, atividadeOrigemId: null, origem: "manual", riscos: [] }],
-      }));
+      if (isAtividadeDuplicada(draftRef.current.atividades, { atividadeOrigemId: null, nome })) {
+        toast.push(`A atividade “${nome}” já está nesta APR.`, "warning");
+        return;
+      }
+      const nova = { key: novaKey("a"), nome, categoria: null, atividadeOrigemId: null, origem: "manual" as const, riscos: [] };
+      atualizar((d) => ({ ...d, atividades: adicionarAtividadesSemDuplicar(d.atividades, [nova]) }));
       toast.push(`Atividade manual “${nome}” adicionada. Inclua os riscos aplicáveis.`, "info");
     },
     [atualizar, toast],
@@ -227,6 +235,7 @@ export function AprWizard({
       return id;
     } catch (e) {
       setErroGeral(e instanceof Error ? e.message : "Falha de comunicação ao salvar.");
+      topoRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       return null;
     } finally {
       setSalvando(false);
@@ -236,14 +245,17 @@ export function AprWizard({
   function irPara(n: number) {
     setEtapa(n);
     setErros({});
+    setPendenciasEtapa([]);
     topoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function avancar() {
     const e = validarDraft(draft, etapa);
     setErros(e);
-    if (Object.keys(e).length) {
-      toast.push("Há campos que precisam de atenção nesta etapa.", "warning");
+    const pendencias = [...new Set(Object.values(e))];
+    setPendenciasEtapa(pendencias);
+    if (pendencias.length) {
+      topoRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     const proxima = etapa + 1;
@@ -392,6 +404,17 @@ export function AprWizard({
         <div className="flex-1 overflow-y-auto bg-[#F7F9FB] p-5 md:p-7 relative" ref={topoRef}>
           <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
             <div className="min-w-0">
+              {pendenciasEtapa.length > 0 && (
+                <div className="mb-4">
+                  <Alert tone="warning" title="Para avançar, resolva:">
+                    <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                      {pendenciasEtapa.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  </Alert>
+                </div>
+              )}
               {erroGeral && (
                 <div className="mb-4">
                   <Alert tone="danger" title="Falha de comunicação" action={<Button size="sm" variant="secondary" onClick={() => void salvar(draft)}>Tentar novamente</Button>}>
@@ -453,7 +476,7 @@ export function AprWizard({
                   </div>
                 )}
               
-                {(etapa === 1 || etapa === 2) && (
+                {etapa === 1 && (
                   <div className="w-full mt-4">
                     {painelAssistente}
                   </div>
@@ -466,47 +489,30 @@ export function AprWizard({
 
         {/* Footer */}
         <div className="flex-none px-5 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-7 py-4 rounded-xl text-[14.5px] font-medium text-slate-600 hover:bg-slate-100 transition"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancelar
-          </button>
+          </Button>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => void salvar(draft)} disabled={salvando} className="hidden sm:inline-flex px-7 py-4 rounded-xl text-[14.5px] font-medium text-slate-600 hover:bg-slate-100 transition">
-              Salvar rascunho
-            </Button>
-            
             {etapa > 1 && (
-              <button
-                type="button"
-                onClick={() => irPara(etapa - 1)}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-[12.5px] font-medium text-slate-700 hover:bg-slate-100 transition"
-              >
-                <ChevronLeft className="w-6 h-6" />
+              <Button variant="ghost" onClick={() => irPara(etapa - 1)}>
+                <ChevronLeft className="w-4 h-4" />
                 Voltar
-              </button>
+              </Button>
             )}
             {etapa < 4 ? (
-              <button
-                type="button"
-                onClick={() => void avancar()}
-                disabled={salvando}
-                className="inline-flex items-center gap-1.5 px-7 py-4 rounded-xl text-[14.5px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition disabled:opacity-50"
-              >
-                {etapa === 3 ? "Revisar APR" : "Continuar"}
-              </button>
+              <Button onClick={() => void avancar()} loading={salvando}>
+                {etapa === 3 ? "Revisar APR" : "Avançar"}
+                <ChevronRight className="w-4 h-4" />
+              </Button>
             ) : (
-              <button
-                type="button"
+              <Button
                 onClick={() => setConfirmEnvio(true)}
-                disabled={!draft.revisadaPeloAutor || Object.keys(validarDraft(draft, 3)).length > 0 || enviando}
-                className="inline-flex items-center gap-1.5 px-7 py-4 rounded-xl text-[14.5px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition disabled:opacity-50"
+                disabled={!draft.revisadaPeloAutor || Object.keys(validarDraft(draft, 3)).length > 0}
+                loading={enviando}
               >
                 Enviar para aprovação
-              </button>
+              </Button>
             )}
           </div>
         </div>

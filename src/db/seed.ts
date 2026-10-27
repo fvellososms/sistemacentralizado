@@ -43,7 +43,7 @@ export async function runSeed() {
   // 2. User profile
   await db.insert(userProfiles).values({
     name: "Alberto Martins",
-    email: "carlos.silva@construtora.com.br",
+    email: "fvellososms@gmail.com",
     role: "Encarregado Geral de Obra",
     cpf: "284.915.738-92",
     phone: "(11) 98765-4321",
@@ -51,7 +51,7 @@ export async function runSeed() {
     address: "Rua das Palmeiras, 340, Apto 52 - Santana, São Paulo - SP",
     department: "Engenharia & Produção",
     avatarUrl: "https://images.pexels.com/photos/8960995/pexels-photo-8960995.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
-    passwordHash: "123456",
+    passwordHash: "senha12345678",
   });
 
   // Calculate dates around current date:
@@ -139,6 +139,8 @@ export async function runSeed() {
       dayOfWeek: dow,
       dayStatus: item.status,
       workCondition: item.cond,
+      workConditionMorning: item.cond,
+      workConditionAfternoon: item.cond,
       weatherMorning: item.mWeather,
       weatherAfternoon: item.aWeather,
       ownTeamCount: item.own,
@@ -259,6 +261,8 @@ export async function runSeed() {
     dayOfWeek: "qua",
     dayStatus: "trabalhando",
     workCondition: "praticavel",
+    workConditionMorning: "praticavel",
+    workConditionAfternoon: "praticavel",
     weatherMorning: "sol",
     weatherAfternoon: "sol",
     ownTeamCount: 12,

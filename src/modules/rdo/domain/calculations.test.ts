@@ -5,6 +5,7 @@ import {
   calculateStandardHours,
   calculateTotalOvertime,
   calculateTotalHh,
+  calculateStandardHoursByShift,
 } from "./calculations.ts";
 
 describe("RDO Domain Calculations", () => {
@@ -87,5 +88,30 @@ describe("RDO Domain Calculations", () => {
       activities: [{ hasOvertime: true, overtimeHours: 10 }],
     });
     assert.equal(hh, "0.0");
+  });
+
+  it("computes standard hours by impracticable shifts", () => {
+    assert.equal(calculateStandardHoursByShift({ workConditionMorning: "praticavel", workConditionAfternoon: "praticavel" }), 8);
+    assert.equal(calculateStandardHoursByShift({ workConditionMorning: "impraticavel", workConditionAfternoon: "praticavel" }), 4);
+    assert.equal(calculateStandardHoursByShift({ workConditionMorning: "praticavel", workConditionAfternoon: "impraticavel" }), 4);
+    assert.equal(calculateStandardHoursByShift({ workConditionMorning: "impraticavel", workConditionAfternoon: "impraticavel" }), 0);
+  });
+
+  it("uses shift conditions over day status for total HH when shifts are given", () => {
+    const halfDay = calculateTotalHh({
+      dayStatus: "paralisado_chuva",
+      workConditionMorning: "praticavel",
+      workConditionAfternoon: "impraticavel",
+      ownTeamCount: 10,
+    });
+    assert.equal(halfDay, "40.0");
+    const fullDay = calculateTotalHh({
+      dayStatus: "paralisado_chuva",
+      workConditionMorning: "impraticavel",
+      workConditionAfternoon: "impraticavel",
+      ownTeamCount: 10,
+      activities: [{ hasOvertime: true, overtimeHours: 2 }],
+    });
+    assert.equal(fullDay, "2.0");
   });
 });

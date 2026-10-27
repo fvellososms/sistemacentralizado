@@ -43,9 +43,8 @@ export function StepIdentificacao({
     <div className="flex flex-col gap-5">
       <section className="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden p-4 sm:p-6">
         <h2 className="text-[16px] font-semibold text-slate-900 tracking-tight">Identificação</h2>
-        <p className="mt-1 text-sm text-slate-800-secondary">Dados da obra, local e responsáveis pela execução do serviço.</p>
+        <p className="mt-1 text-sm text-slate-500">Local, data e equipe envolvida no serviço.</p>
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Input label="Obra" value={obraNome ?? "Nenhuma obra selecionada"} disabled help="Definida pela obra ativa no cabeçalho." />
           <Input
             label="Local / frente de serviço"
             required
@@ -53,14 +52,6 @@ export function StepIdentificacao({
             value={draft.localObra}
             onChange={(e) => set("localObra", e.target.value)}
             error={erros.localObra}
-          />
-          <Input
-            label="Responsável pela execução"
-            required
-            placeholder="Nome do encarregado ou líder"
-            value={draft.responsavel}
-            onChange={(e) => set("responsavel", e.target.value)}
-            error={erros.responsavel}
           />
           <Input
             label="Data prevista de execução"
@@ -127,8 +118,9 @@ export function riscoBaseParaDraft(r: RiscoBase): RiscoDraft {
     nrs: r.nrs,
     probabilidade: r.probabilidade,
     severidade: r.severidade,
-    selecionado: true,
-    revisado: false,
+    // Riscos sugeridos começam como "Não se aplica": o elaborador marca os aplicáveis.
+    selecionado: false,
+    revisado: true,
     riscoOrigemId: r.id,
     origem: "base",
     controles: r.controles.map((c) => ({
@@ -284,7 +276,8 @@ function AtividadeCard({
     const data = (await res.json()) as { risco: RiscoBase | null };
     if (data.risco) {
       if (a.riscos.some((r) => r.riscoOrigemId === data.risco!.id)) return;
-      onAdicionarRisco({ ...riscoBaseParaDraft(data.risco), revisado: true });
+      // Risco buscado e incluído pelo próprio elaborador já entra como aplicável.
+      onAdicionarRisco({ ...riscoBaseParaDraft(data.risco), selecionado: true });
     }
   }
 
@@ -313,9 +306,9 @@ function AtividadeCard({
             </Badge>
           )}
         </div>
-        {a.origem === "base" && a.riscos.some((r) => !r.revisado) && (
-          <p className="mb-3 rounded-md bg-border-slate-400 ring-slate-400-soft px-3 py-2 text-xs text-blue-900">
-            Os riscos abaixo são sugestões da base de conhecimento. Avalie cada um para a situação real desta frente de serviço.
+        {a.origem === "base" && a.riscos.length > 0 && aplicaveis === 0 && (
+          <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            Os riscos abaixo são sugestões da base de conhecimento e começam como “Não se aplica”. Marque os que se aplicam à situação real desta frente de serviço.
           </p>
         )}
         {erroPendente && <p className="text-red-500 text-xs mt-1 block mb-3">{erroPendente}</p>}
@@ -358,11 +351,11 @@ function RiscoCard({
 }) {
   const estado = !r.revisado ? "pendente" : r.selecionado ? "aplicavel" : "nao_aplica";
   const borda =
-    estado === "pendente" ? "border-amber-200 bg-bg-amber-50 text-amber-700/40" : estado === "aplicavel" ? "border-border-slate-200" : "border-border-slate-200 bg-slate-50 opacity-75";
+    estado === "pendente" ? "border-amber-200 bg-amber-50/60" : estado === "aplicavel" ? "border-slate-300 bg-white" : "border-slate-200 bg-slate-50";
 
   return (
     <li className={`rounded-lg border p-3 sm:p-4 ${borda}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-slate-800">{r.nome}</span>
@@ -372,12 +365,6 @@ function RiscoCard({
                 <span aria-hidden>◔</span> Aguardando revisão
               </Badge>
             )}
-            {estado === "aplicavel" && (
-              <Badge tone="success">
-                <span aria-hidden>✓</span> Aplicável
-              </Badge>
-            )}
-            {estado === "nao_aplica" && <Badge tone="neutral">Não se aplica</Badge>}
             {r.origem === "manual" && <Badge tone="neutral">Manual</Badge>}
           </div>
           {r.nrs.length > 0 && (
@@ -410,19 +397,27 @@ function RiscoCard({
             </div>
           )}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-stretch">
-          {estado !== "aplicavel" && (
-            <Button size="sm" variant="primary" onClick={() => onAtualizar((x) => ({ ...x, selecionado: true, revisado: true }))}>
-              Confirmar aplicável
-            </Button>
-          )}
-          {estado !== "nao_aplica" && (
-            <Button size="sm" variant="secondary" onClick={() => onAtualizar((x) => ({ ...x, selecionado: false, revisado: true }))}>
+        <div className="flex shrink-0 items-center gap-2">
+          <div role="group" aria-label={`Aplicabilidade do risco ${r.nome}`} className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+            <button
+              type="button"
+              aria-pressed={estado === "aplicavel"}
+              onClick={() => onAtualizar((x) => ({ ...x, selecionado: true, revisado: true }))}
+              className={`px-3 py-1.5 rounded-[10px] text-[12.5px] font-medium transition ${estado === "aplicavel" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              Aplicável
+            </button>
+            <button
+              type="button"
+              aria-pressed={estado === "nao_aplica"}
+              onClick={() => onAtualizar((x) => ({ ...x, selecionado: false, revisado: true }))}
+              className={`px-3 py-1.5 rounded-[10px] text-[12.5px] font-medium transition ${estado === "nao_aplica" ? "bg-white text-slate-900 border border-slate-200 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
               Não se aplica
-            </Button>
-          )}
+            </button>
+          </div>
           {r.origem === "manual" && (
-            <Button size="sm" variant="ghost" onClick={onRemover}>
+            <Button size="sm" variant="ghost" onClick={onRemover} aria-label={`Remover risco ${r.nome}`}>
               Remover
             </Button>
           )}

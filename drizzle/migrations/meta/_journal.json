@@ -8,6 +8,20 @@
       "when": 1792180607663,
       "tag": "0000_romantic_hardball",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793054144087,
+      "tag": "0001_rdo_work_condition_by_shift",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793057459065,
+      "tag": "0002_quality_nao_conformidades",
+      "breakpoints": true
     }
   ]
 }

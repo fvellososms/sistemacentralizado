@@ -3,7 +3,7 @@ import type { UserProfile } from "./types";
 export const DEFAULT_PROFILE: UserProfile = {
   id: 1,
   name: "Alberto Martins",
-  email: "carlos.silva@construtora.com.br",
+  email: "fvellososms@gmail.com",
   role: "Encarregado Geral de Obra",
   cpf: "284.915.738-92",
   phone: "(11) 98765-4321",

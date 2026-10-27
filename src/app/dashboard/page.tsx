@@ -17,13 +17,27 @@ import {
   Calendar,
   CheckCircle2,
   Sparkles,
+  ClipboardCheck,
+  AlertCircle,
+  ShieldAlert,
 } from "lucide-react";
 import { RdoDetailModal } from "@/components/RdoDetailModal";
-import { calculateQualityScore } from "@/modules/quality";
+import {
+  calculateQualityScore,
+  calculateChecklistCompliance,
+  calculateOverdueInspections,
+} from "@/modules/quality";
+import {
+  calculateOperationalEvolution,
+  calculateTopNrs,
+  type WeeklyEvolutionItem,
+} from "@/modules/rdo";
+import type { RiskCategoryDistribution } from "@/modules/apr";
 
 export default function DashboardPage() {
   const { activeProject, openCreateModal } = useApp();
   const [rdosList, setRdosList] = useState<any[]>([]);
+  const [riskDistribution, setRiskDistribution] = useState<RiskCategoryDistribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRdoId, setSelectedRdoId] = useState<number | null>(null);
 
@@ -35,22 +49,47 @@ export default function DashboardPage() {
       const data = await res.json();
       if (data.rdos) setRdosList(data.rdos);
     } catch (e) {
-      console.error(e);
+      console.error("fetchDashboardData error:", e);
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchRiskDistribution = async () => {
+    if (!activeProject) return;
+    try {
+      const q = new URLSearchParams({
+        obraId: String(activeProject.id),
+        codigo: activeProject.code || "",
+        nome: activeProject.name || "",
+      });
+      const res = await fetch(`/api/apr/riscos-distribuicao?${q.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.distribution) {
+          setRiskDistribution(data.distribution);
+        }
+      }
+    } catch (e) {
+      console.warn("fetchRiskDistribution error:", e);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchRiskDistribution();
   }, [activeProject]);
 
   useEffect(() => {
-    const handleCreated = () => fetchDashboardData();
+    const handleCreated = () => {
+      fetchDashboardData();
+      fetchRiskDistribution();
+    };
     window.addEventListener("rdo-created", handleCreated);
     return () => window.removeEventListener("rdo-created", handleCreated);
   }, [activeProject]);
 
+  // Existing KPIs calculations
   const totalRdos = rdosList.length;
   const totalHh = rdosList.reduce((acc, r) => acc + (parseFloat(r.totalHh) || 0), 0);
   const totalOccurrences = rdosList.filter((r) => r.hasOccurrences).length;
@@ -59,6 +98,13 @@ export default function DashboardPage() {
   const ownHeadcount = latestRdo?.ownTeamCount || 0;
   const contractorHeadcount = latestRdo?.contractorTeamCount || 0;
   const qualityScore = calculateQualityScore(totalOccurrences);
+
+  // Incremental metrics calculations
+  const allNonConfs = rdosList.flatMap((r) => r.nonConformitiesList || []);
+  const topNrs = calculateTopNrs(allNonConfs);
+  const evolutionData = calculateOperationalEvolution(rdosList);
+  const checklistCompliance = calculateChecklistCompliance([]);
+  const overdueInspections = calculateOverdueInspections([]);
 
   return (
     <AppLayout>
@@ -87,7 +133,7 @@ export default function DashboardPage() {
             onClick={() => openCreateModal()}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm self-start sm:self-auto"
           >
-            <Plus className="w-6 h-6" strokeWidth={2.2} />
+            <Plus className="w-4 h-4" strokeWidth={2.2} />
             <span>Novo RDO</span>
           </button>
         </div>
@@ -240,6 +286,108 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Incremental Small Cards: Checklists, Inspeções Vencidas e Top 3 NRs */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Card: Conformidade dos checklists */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <ClipboardCheck className="w-4 h-4 text-emerald-600" strokeWidth={2} />
+              </div>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                Checklists
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-semibold text-slate-900 tracking-tight">
+                {checklistCompliance.percentage !== null
+                  ? `${checklistCompliance.percentage}%`
+                  : "—"}
+              </span>
+            </div>
+            <div className="text-[13px] font-semibold text-slate-900 tracking-tight mt-1">
+              Conformidade dos checklists
+            </div>
+            <div className="text-[12px] text-slate-500 mt-0.5">
+              {checklistCompliance.percentage !== null
+                ? `${checklistCompliance.conformCount} de ${checklistCompliance.evaluatedCount} itens conformes`
+                : "Sem checklists avaliados no período"}
+            </div>
+          </div>
+
+          {/* Card: Inspeções vencidas */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
+            <div className="flex items-center justify-between mb-3">
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                  overdueInspections.overdueCount > 0
+                    ? "bg-rose-50 text-rose-600"
+                    : "bg-amber-50 text-amber-600"
+                }`}
+              >
+                <AlertCircle className="w-4 h-4" strokeWidth={2} />
+              </div>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                Inspeções
+              </span>
+            </div>
+            <div
+              className={`text-2xl font-semibold tracking-tight ${
+                overdueInspections.overdueCount > 0 ? "text-rose-600" : "text-slate-900"
+              }`}
+            >
+              {String(overdueInspections.overdueCount).padStart(2, "0")}
+            </div>
+            <div className="text-[13px] font-semibold text-slate-900 tracking-tight mt-1">
+              Inspeções vencidas
+            </div>
+            <div className="text-[12px] text-slate-500 mt-0.5">
+              {overdueInspections.overdueCount > 0
+                ? "Inspeções pendentes com prazo expirado"
+                : "Nenhuma inspeção em atraso"}
+            </div>
+          </div>
+
+          {/* Card: Top 3 NRs com não conformidades */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                  <ShieldAlert className="w-4 h-4 text-slate-700" strokeWidth={2} />
+                </div>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                  Ranking SST
+                </span>
+              </div>
+              <div className="text-[13px] font-semibold text-slate-900 tracking-tight mb-2">
+                Top 3 NRs com não conformidades
+              </div>
+            </div>
+
+            {topNrs.length > 0 ? (
+              <div className="space-y-1.5 mt-0.5">
+                {topNrs.map((item) => (
+                  <div key={item.nr} className="flex items-center justify-between text-[12px]">
+                    <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                      <span className="w-4 text-[10px] font-bold text-slate-400">
+                        {item.rank}º
+                      </span>
+                      <span>{item.nr}</span>
+                    </span>
+                    <span className="text-slate-500 font-semibold tabular-nums text-[11px]">
+                      {item.count} {item.count === 1 ? "registro" : "registros"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[12px] text-slate-500 mt-0.5">
+                Nenhuma não conformidade registrada no período
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Main grid: chart + side */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Histogram chart */}
@@ -313,7 +461,7 @@ export default function DashboardPage() {
               className="w-full group flex items-center gap-3.5 p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-slate-900 group-hover:scale-105 flex items-center justify-center transition">
-                <Plus className="w-6 h-6 text-white" strokeWidth={2.2} />
+                <Plus className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
               </div>
               <div className="flex-1">
                 <div className="text-[13.5px] font-semibold text-slate-900">
@@ -323,7 +471,7 @@ export default function DashboardPage() {
                   Preenchimento em 6 etapas
                 </div>
               </div>
-              <ArrowRight className="w-6 h-6 text-slate-300 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
+              <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
             </button>
 
             <Link
@@ -369,6 +517,49 @@ export default function DashboardPage() {
                 {activeProject?.companyName}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Incremental Charts Section: Evolução Operacional & Distribuição de Riscos */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Gráfico: Evolução Operacional */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">
+                  Evolução operacional
+                </h2>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  Mão de obra registrada por semana
+                </p>
+              </div>
+              <span className="text-[11px] font-medium text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                Média diária (efetivo)
+              </span>
+            </div>
+
+            <div className="p-6">
+              <OperationalEvolutionChart data={evolutionData} />
+            </div>
+          </div>
+
+          {/* Gráfico: Distribuição de Riscos Registrados */}
+          <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">
+                  Distribuição de riscos registrados
+                </h2>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  Classificação APR da obra
+                </p>
+              </div>
+              <span className="text-[11px] font-medium text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                Matriz 3×3
+              </span>
+            </div>
+
+            <RiskDistributionChart distribution={riskDistribution} />
           </div>
         </div>
 
@@ -482,5 +673,229 @@ export default function DashboardPage() {
         onRefresh={() => fetchDashboardData()}
       />
     </AppLayout>
+  );
+}
+
+/**
+ * Gráfico de Linhas: Evolução Operacional
+ * Sem bibliotecas pesadas, renderizado via SVG responsivo e Tailwind.
+ */
+function OperationalEvolutionChart({ data }: { data: WeeklyEvolutionItem[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-44 flex flex-col items-center justify-center text-slate-400 text-xs">
+        <TrendingUp className="w-6 h-6 mb-1.5 text-slate-300 stroke-[1.5]" />
+        <span>Nenhum dado semanal registrado no período</span>
+      </div>
+    );
+  }
+
+  const width = 540;
+  const height = 180;
+  const paddingX = 45;
+  const paddingTop = 25;
+  const paddingBottom = 35;
+
+  const maxVal = Math.max(10, ...data.map((d) => d.averageHeadcount));
+  const ceilMax = Math.ceil(maxVal * 1.25);
+
+  const getX = (idx: number) => {
+    if (data.length === 1) return width / 2;
+    return paddingX + (idx / (data.length - 1)) * (width - paddingX * 2);
+  };
+
+  const getY = (val: number) => {
+    const usableH = height - paddingTop - paddingBottom;
+    return height - paddingBottom - (val / ceilMax) * usableH;
+  };
+
+  const points = data.map((d, i) => ({
+    x: getX(i),
+    y: getY(d.averageHeadcount),
+    item: d,
+  }));
+
+  const pathD = points.reduce(
+    (acc, pt, i) => `${acc} ${i === 0 ? "M" : "L"} ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`,
+    ""
+  );
+
+  const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)},${height - paddingBottom} L ${points[0].x.toFixed(1)},${height - paddingBottom} Z`;
+
+  // Horizontal grid lines
+  const gridSteps = 3;
+  const gridLines = Array.from({ length: gridSteps + 1 }, (_, i) => {
+    const val = Math.round((ceilMax / gridSteps) * i);
+    const y = getY(val);
+    return { val, y };
+  });
+
+  const activeItem = hoveredIdx !== null ? points[hoveredIdx] : null;
+
+  return (
+    <div className="relative">
+      {/* Tooltip */}
+      {activeItem && (
+        <div
+          className="absolute z-10 pointer-events-none -top-1 bg-slate-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 shadow-lg transform -translate-x-1/2 transition-all flex flex-col items-center"
+          style={{
+            left: `${(activeItem.x / width) * 100}%`,
+          }}
+        >
+          <span className="font-semibold">{activeItem.item.weekLabel}</span>
+          <span className="text-slate-300">
+            {activeItem.item.averageHeadcount.toFixed(1)} operários/dia
+          </span>
+          <span className="text-slate-400 text-[10px]">
+            {activeItem.item.daysRecorded} {activeItem.item.daysRecorded === 1 ? "dia registrado" : "dias registrados"}
+          </span>
+        </div>
+      )}
+
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-44 overflow-visible"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0F172A" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#0F172A" stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid lines */}
+        {gridLines.map((g, i) => (
+          <g key={i}>
+            <line
+              x1={paddingX}
+              y1={g.y}
+              x2={width - paddingX}
+              y2={g.y}
+              stroke="#F1F5F9"
+              strokeDasharray={i === 0 ? "0" : "3 3"}
+              strokeWidth="1"
+            />
+            <text
+              x={paddingX - 10}
+              y={g.y + 3.5}
+              textAnchor="end"
+              className="text-[10px] fill-slate-400 font-medium"
+            >
+              {g.val}
+            </text>
+          </g>
+        ))}
+
+        {/* Area fill */}
+        <path d={areaD} fill="url(#areaGradient)" />
+
+        {/* Line stroke */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke="#0F172A"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Points and labels */}
+        {points.map((pt, i) => {
+          const isHovered = hoveredIdx === i;
+          return (
+            <g
+              key={i}
+              className="cursor-pointer"
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              {/* Invisible larger hover hit area */}
+              <circle cx={pt.x} cy={pt.y} r="14" fill="transparent" />
+
+              {/* Point circle */}
+              <circle
+                cx={pt.x}
+                cy={pt.y}
+                r={isHovered ? "5.5" : "3.5"}
+                fill="#FFFFFF"
+                stroke="#0F172A"
+                strokeWidth={isHovered ? "2.5" : "2"}
+                className="transition-all"
+              />
+
+              {/* X-axis label */}
+              <text
+                x={pt.x}
+                y={height - 12}
+                textAnchor="middle"
+                className={`text-[11px] font-medium transition-colors ${
+                  isHovered ? "fill-slate-900 font-semibold" : "fill-slate-500"
+                }`}
+              >
+                {pt.item.weekLabel}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * Gráfico de Barras Horizontais: Distribuição de riscos registrados
+ * Segue à risca as regras:
+ * - Exatamente 3 categorias: Baixo, Médio, Alto (sem Crítico)
+ * - Cores obrigatórias: #57A98B, #D6AE58, #DF7953
+ * - Rótulo ~52px, barra ~10px altura, rounded-full, fundo bg-slate-100, alinhamento à direita.
+ */
+function RiskDistributionChart({
+  distribution,
+}: {
+  distribution: RiskCategoryDistribution[];
+}) {
+  const items =
+    distribution && distribution.length > 0
+      ? distribution
+      : [
+          { category: "Baixo" as const, count: 0, percentage: 0, color: "#57A98B" },
+          { category: "Médio" as const, count: 0, percentage: 0, color: "#D6AE58" },
+          { category: "Alto" as const, count: 0, percentage: 0, color: "#DF7953" },
+        ];
+
+  const totalRisks = items.reduce((acc, it) => acc + it.count, 0);
+
+  return (
+    <div className="p-6 flex flex-col justify-between h-[210px]">
+      <div className="space-y-3 pt-2">
+        {items.map((item) => (
+          <div key={item.category} className="flex items-center gap-3">
+            <span className="w-[52px] text-[12px] font-medium text-slate-600">
+              {item.category}
+            </span>
+            <div className="flex-1 h-[10px] bg-slate-100 rounded-full overflow-hidden">
+              <div
+                style={{
+                  width: `${item.percentage}%`,
+                  backgroundColor: item.color,
+                }}
+                className="h-full rounded-full transition-all duration-500"
+              />
+            </div>
+            <span className="w-8 text-right text-[12px] font-semibold text-slate-800 tabular-nums">
+              {item.count}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+        <span>{totalRisks} riscos mapeados em APR</span>
+        <span>Proporção normalizada</span>
+      </div>
+    </div>
   );
 }

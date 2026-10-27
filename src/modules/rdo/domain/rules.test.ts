@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { computeDayOfWeek, validateRdoCreation } from "./rules.ts";
+import {
+  computeDayOfWeek,
+  isDayStopped,
+  resolveDayConditions,
+  validateRdoCreation,
+} from "./rules.ts";
 
 describe("RDO Domain Rules", () => {
   it("computes day of week accurately without timezone shift", () => {
@@ -51,5 +56,38 @@ describe("RDO Domain Rules", () => {
     });
     assert.equal(res.isValid, true);
     assert.equal(res.errors.length, 0);
+  });
+
+  it("resolves day-level condition and status from the shifts", () => {
+    assert.deepEqual(resolveDayConditions({ workConditionMorning: "praticavel", workConditionAfternoon: "praticavel" }), {
+      workConditionMorning: "praticavel",
+      workConditionAfternoon: "praticavel",
+      workCondition: "praticavel",
+      dayStatus: "trabalhando",
+    });
+    assert.deepEqual(resolveDayConditions({ workConditionMorning: "praticavel", workConditionAfternoon: "impraticavel" }), {
+      workConditionMorning: "praticavel",
+      workConditionAfternoon: "impraticavel",
+      workCondition: "impraticavel",
+      dayStatus: "paralisado_chuva",
+    });
+    assert.deepEqual(resolveDayConditions({}), {
+      workConditionMorning: "praticavel",
+      workConditionAfternoon: "praticavel",
+      workCondition: "praticavel",
+      dayStatus: "trabalhando",
+    });
+  });
+
+  it("detects halted days from shifts, day condition or legacy day status", () => {
+    assert.equal(isDayStopped({ workConditionAfternoon: "impraticavel" }), true);
+    assert.equal(isDayStopped({ workCondition: "impraticavel" }), true);
+    assert.equal(isDayStopped({ dayStatus: "paralisado_chuva", workCondition: "praticavel" }), true);
+    assert.equal(
+      isDayStopped({ dayStatus: "trabalhando", workConditionMorning: "praticavel", workConditionAfternoon: "praticavel" }),
+      false
+    );
+    assert.equal(isDayStopped({ dayStatus: "nao_trabalhando" }), false);
+    assert.equal(isDayStopped(null), false);
   });
 });

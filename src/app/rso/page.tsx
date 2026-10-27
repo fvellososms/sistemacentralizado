@@ -108,7 +108,7 @@ export default function RsoPage() {
                 onClick={() => setSelectedWeekOffset(selectedWeekOffset - 1)}
                 className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="text-[12px] font-medium px-2 text-slate-700 whitespace-nowrap">
                 {selectedWeekOffset === 0
@@ -121,7 +121,7 @@ export default function RsoPage() {
                 onClick={() => setSelectedWeekOffset(selectedWeekOffset + 1)}
                 className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600"
               >
-                <ChevronRight className="w-6 h-6" />
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
@@ -134,9 +134,9 @@ export default function RsoPage() {
 
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-7 py-4 rounded-xl text-[16px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
             >
-              <Printer className="w-6 h-6" />
+              <Printer className="w-4 h-4" />
               <span>Imprimir / PDF</span>
             </button>
           </div>
@@ -440,9 +440,9 @@ export default function RsoPage() {
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1.5 px-7 py-4 rounded-xl text-[14.5px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
                   >
-                    <Plus className="w-6 h-6" />
+                    <Plus className="w-4 h-4" />
                     Salvar RSO
                   </button>
                 </div>

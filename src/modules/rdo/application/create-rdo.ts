@@ -1,6 +1,6 @@
 import { AppError } from "@/shared/errors/AppError";
 import { calculateTotalHh, calculateTotalWorkers } from "../domain/calculations";
-import { computeDayOfWeek, validateRdoCreation } from "../domain/rules";
+import { computeDayOfWeek, resolveDayConditions, validateRdoCreation } from "../domain/rules";
 import type { CreateRdoInput } from "../domain/types";
 import { RdoRepository, defaultRdoRepository } from "../infrastructure/rdo-repository";
 
@@ -14,6 +14,9 @@ export async function createRdo(
   }
 
   const dayOfWeek = computeDayOfWeek(input.date);
+  // Legacy callers that send only the day-level fields keep their values.
+  const hasShifts = input.workConditionMorning != null || input.workConditionAfternoon != null;
+  const conditions = hasShifts ? resolveDayConditions(input) : {};
   const ownCount = parseInt(String(input.ownTeamCount ?? 0), 10) || 0;
   const contractors = Array.isArray(input.contractors) ? input.contractors : [];
   const contractorCount = contractors.reduce(
@@ -26,6 +29,7 @@ export async function createRdo(
     ? String(input.totalHh)
     : calculateTotalHh({
         dayStatus: input.dayStatus,
+        ...conditions,
         ownTeamCount: ownCount,
         contractors,
         activities: input.activities,
@@ -35,6 +39,7 @@ export async function createRdo(
 
   const created = await repo.create({
     ...input,
+    ...conditions,
     rdoNumber: nextRdoNumber,
     dayOfWeek,
     totalHh,

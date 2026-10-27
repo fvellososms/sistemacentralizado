@@ -28,7 +28,10 @@ export async function ensureSeeded() {
   seeding = (async () => {
     try {
       const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(atividades);
-      if (Number(count) === 0) {
+      const [{ count: qtdUsuarios }] = await db.select({ count: sql<number>`count(*)::int` }).from(usuarios);
+      // Demo users, obras and APRs only go into a completely empty database; otherwise
+      // just the knowledge base (NRs, controls, risks, activities) is synced.
+      if (Number(count) === 0 && Number(qtdUsuarios) === 0) {
         await seedTudo();
       } else {
         await syncNovosItens();
@@ -254,7 +257,7 @@ async function seedTudo() {
       .insert(usuarios)
       .values([
         { nome: "Carlos Andrade", email: "carlos.andrade@fvelloso.com.br", cargo: "Encarregado de obra", perfil: "colaborador" },
-        { nome: "Mariana Souza", email: "mariana.souza@fvelloso.com.br", cargo: "Técnica de Segurança do Trabalho", perfil: "admin_sst" },
+        { nome: "Alberto Martins", email: "fvellososms@gmail.com", senhaHash: "senha12345678", cargo: "Encarregado Geral de Obra", perfil: "admin_sst" },
         { nome: "Roberto Lima", email: "roberto.lima@fvelloso.com.br", cargo: "Engenheiro de Segurança", perfil: "aprovador" },
       ])
       .returning();
@@ -416,6 +419,14 @@ async function syncNovosItens() {
     // 2. NRs
     const nrRows = await tx.select().from(nrs);
     const nrCodeToId = new Map(nrRows.map((n) => [n.codigo, n.id]));
+    const nrsFaltando = NRS.filter(([codigo]) => !nrCodeToId.has(codigo));
+    if (nrsFaltando.length) {
+      const inseridas = await tx
+        .insert(nrs)
+        .values(nrsFaltando.map(([codigo, descricao]) => ({ codigo, descricao })))
+        .returning();
+      for (const n of inseridas) nrCodeToId.set(n.codigo, n.id);
+    }
 
     // 3. Riscos
     const existingRiscos = await tx.select({ id: riscos.id, nome: riscos.nome }).from(riscos);
@@ -476,4 +487,17 @@ async function syncNovosItens() {
       }
     }
   });
+}
+
+// `npm run seed:apr`: syncs the knowledge base into the database configured in .env.local.
+if (process.argv[1]?.endsWith("seed-apr.ts")) {
+  ensureSeeded()
+    .then(() => {
+      console.log("Base de conhecimento de APR sincronizada.");
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }
