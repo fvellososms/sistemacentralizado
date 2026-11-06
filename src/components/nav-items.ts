@@ -32,7 +32,7 @@ export function buildNavItems({ isAdmin, lateTasks }: { isAdmin: boolean; lateTa
       icon: ShieldCheck,
       children: [
         { label: "Visão geral", href: "/dashboard/qualidade" },
-        { label: "Não conformidades", href: "/dashboard/qualidade/nao-conformidades" },
+        { label: "Oportunidades de Melhoria", href: "/dashboard/qualidade/nao-conformidades" },
         { label: "Checklist Equipamentos", href: "/dashboard/qualidade/checklist-equipamentos" },
         { label: "Checklist EPI", href: "/dashboard/qualidade/checklist-epi" },
         { label: "Inspeções programadas", href: "/dashboard/qualidade/inspecoes" },

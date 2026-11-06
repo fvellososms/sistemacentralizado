@@ -21,8 +21,8 @@ export async function POST(request: Request) {
       defaultMailer,
       await getSessionUser()
     );
-    return NextResponse.json({ naoConformidade, email, message: "Não conformidade registrada." }, { status: 201 });
+    return NextResponse.json({ naoConformidade, email, message: "Oportunidade de melhoria registrada." }, { status: 201 });
   } catch (error) {
-    return errorResponse(error, "Falha ao registrar a não conformidade.", "Erro ao registrar não conformidade");
+    return errorResponse(error, "Falha ao registrar a oportunidade de melhoria.", "Erro ao registrar oportunidade de melhoria");
   }
 }

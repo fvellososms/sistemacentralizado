@@ -116,11 +116,11 @@ export function NcDetailModal({
     try {
       const res = await fetch(`/api/qualidade/nao-conformidades/${ncId}`);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Não foi possível carregar a NC.");
+      if (!res.ok) throw new Error(data.error || "Não foi possível carregar a OM.");
       setNc(data.naoConformidade);
       setLoadError(null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Não foi possível carregar a NC.");
+      setLoadError(e instanceof Error ? e.message : "Não foi possível carregar a OM.");
     }
   }, [ncId]);
 
@@ -129,11 +129,11 @@ export function NcDetailModal({
     fetch(`/api/qualidade/nao-conformidades/${ncId}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Não foi possível carregar a NC.");
+        if (!res.ok) throw new Error(data.error || "Não foi possível carregar a OM.");
         if (active) setNc(data.naoConformidade);
       })
       .catch((e) => {
-        if (active) setLoadError(e instanceof Error ? e.message : "Não foi possível carregar a NC.");
+        if (active) setLoadError(e instanceof Error ? e.message : "Não foi possível carregar a OM.");
       });
     return () => {
       active = false;
@@ -177,7 +177,7 @@ export function NcDetailModal({
         <div className="flex-none px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
-              Tratamento de NC · NC-{String(ncId).padStart(4, "0")}
+              Tratamento de OM · OM-{String(ncId).padStart(4, "0")}
             </span>
             <h2 id="nc-detalhe-titulo" className="text-[15px] font-semibold text-slate-900 mt-0.5 truncate">{nc?.titulo ?? "Carregando…"}</h2>
             {nc && (
@@ -216,7 +216,7 @@ export function NcDetailModal({
             <>
               {nc.status === "cancelada" ? (
                 <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-[13px] text-slate-700">
-                  <strong>NC cancelada.</strong> Motivo: {nc.canceladaMotivo ?? "—"}
+                  <strong>OM cancelada.</strong> Motivo: {nc.canceladaMotivo ?? "—"}
                 </div>
               ) : (
                 <ol className="grid grid-cols-4 gap-2" aria-label="Etapas do tratamento">
@@ -233,7 +233,7 @@ export function NcDetailModal({
                 </ol>
               )}
 
-              <Secao titulo="Dados da não conformidade">
+              <Secao titulo="Dados da oportunidade de melhoria">
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[12.5px]">
                   <Item k="Obra" v={nc.projectName ?? "—"} />
                   <Item k="Local" v={nc.localObra} />
@@ -247,7 +247,7 @@ export function NcDetailModal({
                 <p className="mt-3 text-[12.5px] text-slate-700 whitespace-pre-line">{nc.descricao}</p>
                 {nc.fotoUrl && (
                   // eslint-disable-next-line @next/next/no-img-element -- data URL photo
-                  <img src={nc.fotoUrl} alt={`Foto da NC ${nc.titulo}`} className="mt-3 w-40 h-28 object-cover rounded-xl border border-slate-200" />
+                  <img src={nc.fotoUrl} alt={`Foto da OM ${nc.titulo}`} className="mt-3 w-40 h-28 object-cover rounded-xl border border-slate-200" />
                 )}
               </Secao>
 
@@ -265,7 +265,7 @@ export function NcDetailModal({
                     salvando={busy === "definir_plano"}
                     onCancel={nc.status === "aberta" ? undefined : () => setEditandoPlano(false)}
                     onSave={async (plano) => {
-                      const ok = await fluxo("definir_plano", { plano }, nc.status === "aberta" ? "Plano de ação definido. A NC está em tratamento." : "Plano de ação atualizado.");
+                      const ok = await fluxo("definir_plano", { plano }, nc.status === "aberta" ? "Plano de ação definido. A OM está em tratamento." : "Plano de ação atualizado.");
                       if (ok) setEditandoPlano(false);
                     }}
                   />
@@ -285,7 +285,7 @@ export function NcDetailModal({
                 <Secao titulo="Verificação de eficácia">
                   {pode("verificar").allowed ? (
                     <VerificacaoForm salvando={busy === "verificar"} onSubmit={(resultado, observacao) =>
-                      fluxo("verificar", { resultado, observacao }, resultado === "eficaz" ? "NC encerrada: ação eficaz." : "Tratamento reaberto: ação ineficaz.")
+                      fluxo("verificar", { resultado, observacao }, resultado === "eficaz" ? "OM encerrada: ação eficaz." : "Tratamento reaberto: ação ineficaz.")
                     } />
                   ) : nc.verificacaoResultado ? (
                     <p className="text-[12.5px] text-slate-700">
@@ -304,7 +304,7 @@ export function NcDetailModal({
                   hoje={hoje}
                   busy={busy}
                   onProrrogar={(novoPrazo, justificativa) => fluxo("prorrogar", { novoPrazo, justificativa }, "Prazo prorrogado.")}
-                  onCancelar={(motivo) => fluxo("cancelar", { motivo }, "NC cancelada.")}
+                  onCancelar={(motivo) => fluxo("cancelar", { motivo }, "OM cancelada.")}
                 />
               )}
 
@@ -343,7 +343,7 @@ export function NcDetailModal({
                 disabled={!pode("enviar_verificacao").allowed}
                 title={pode("enviar_verificacao").reason}
                 loading={busy === "enviar_verificacao"}
-                onClick={() => void fluxo("enviar_verificacao", {}, "NC enviada para verificação de eficácia.")}
+                onClick={() => void fluxo("enviar_verificacao", {}, "OM enviada para verificação de eficácia.")}
               >
                 <Send className="w-3.5 h-3.5" />
                 Enviar para verificação
@@ -586,7 +586,7 @@ function PlanoEditor({
         </label>
         <label className="block sm:col-span-2">
           <span className={labelClass}>Causa raiz *</span>
-          <textarea rows={2} value={causaRaiz} onChange={(e) => setCausaRaiz(e.target.value)} className={`${inputClass} resize-y ${errors.causaRaiz ? "border-red-300" : "border-slate-200"}`} placeholder="A causa fundamental que, eliminada, impede a repetição da NC" />
+          <textarea rows={2} value={causaRaiz} onChange={(e) => setCausaRaiz(e.target.value)} className={`${inputClass} resize-y ${errors.causaRaiz ? "border-red-300" : "border-slate-200"}`} placeholder="A causa fundamental que, eliminada, impede a repetição da OM" />
           {errors.causaRaiz && <span className="block text-[11px] text-red-600 mt-1">{errors.causaRaiz}</span>}
         </label>
       </div>
@@ -717,10 +717,10 @@ function AdminAcoes({
           </div>
         </details>
         <details className="rounded-xl border border-red-100 p-3.5">
-          <summary className="cursor-pointer text-[12.5px] font-semibold text-red-700">Cancelar NC</summary>
+          <summary className="cursor-pointer text-[12.5px] font-semibold text-red-700">Cancelar OM</summary>
           <div className="mt-3 space-y-2.5">
             <textarea rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo (ex.: registrada em duplicidade)" className={`${inputClass} border-slate-200 resize-y`} />
-            <Button size="sm" variant="danger" loading={busy === "cancelar"} onClick={() => void onCancelar(motivo)}>Cancelar NC</Button>
+            <Button size="sm" variant="danger" loading={busy === "cancelar"} onClick={() => void onCancelar(motivo)}>Cancelar OM</Button>
           </div>
         </details>
       </div>

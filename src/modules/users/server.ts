@@ -1,5 +1,6 @@
 export * from "./domain/rules";
 export * from "./domain/access";
+export * from "./domain/rate-limit";
 
 export * from "./application/session";
 export * from "./application/get-profile";

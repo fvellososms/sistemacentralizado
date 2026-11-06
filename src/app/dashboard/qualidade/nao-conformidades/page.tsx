@@ -133,15 +133,15 @@ export default function NaoConformidadesPage() {
               <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
                 <FileWarning className="w-4.5 h-4.5 text-emerald-600" strokeWidth={2} />
               </div>
-              <span>Não conformidades</span>
+              <span>Oportunidades de Melhoria</span>
             </h1>
             <p className="text-[12.5px] text-slate-500 mt-1">
-              Registro e acompanhamento das NCs da obra {activeProject ? `“${activeProject.name}”` : "ativa"}.
+              Registro e acompanhamento das OMs da obra {activeProject ? `“${activeProject.name}”` : "ativa"}.
             </p>
           </div>
           <Button onClick={() => setModalAberto(true)}>
             <Plus className="w-4 h-4" />
-            Nova não conformidade
+            Nova oportunidade de melhoria
           </Button>
         </div>
 
@@ -199,7 +199,7 @@ export default function NaoConformidadesPage() {
 
         {carregando ? (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-[13px] text-slate-500">
-            Carregando não conformidades…
+            Carregando oportunidades de melhoria…
           </div>
         ) : visiveis.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 border border-dashed border-slate-300 flex flex-col items-center text-center">
@@ -207,10 +207,10 @@ export default function NaoConformidadesPage() {
               <CheckCircle2 className="w-5 h-5 text-slate-500" strokeWidth={1.8} />
             </div>
             <h2 className="text-[15px] font-semibold text-slate-900">
-              {itens.length === 0 ? "Nenhuma não conformidade registrada" : "Nenhuma NC nesta situação"}
+              {itens.length === 0 ? "Nenhuma oportunidade de melhoria registrada" : "Nenhuma OM nesta situação"}
             </h2>
             <p className="text-[12.5px] text-slate-500 mt-1 max-w-sm">
-              Quando uma NC for identificada nesta obra, registre aqui para acompanhar o prazo de resolução.
+              Quando uma OM for identificada nesta obra, registre aqui para acompanhar o prazo de resolução.
             </p>
           </div>
         ) : (
@@ -302,8 +302,8 @@ export default function NaoConformidadesPage() {
             setModalAberto(false);
             setAviso(
               email.sent
-                ? { ok: true, texto: `Não conformidade registrada. Notificação enviada por e-mail para ${destinatario}.` }
-                : { ok: false, texto: `Não conformidade registrada, mas o e-mail não foi enviado: ${email.reason}` }
+                ? { ok: true, texto: `Oportunidade de melhoria registrada. Notificação enviada por e-mail para ${destinatario}.` }
+                : { ok: false, texto: `Oportunidade de melhoria registrada, mas o e-mail não foi enviado: ${email.reason}` }
             );
             void carregar();
           }}
@@ -322,7 +322,7 @@ export default function NaoConformidadesPage() {
       {fotoAberta && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setFotoAberta(null)}>
           <div className="absolute inset-0 bg-slate-900/70" />
-          <img src={fotoAberta} alt="Foto da não conformidade" className="relative max-w-full max-h-[90vh] rounded-xl shadow-xl" />
+          <img src={fotoAberta} alt="Foto da oportunidade de melhoria" className="relative max-w-full max-h-[90vh] rounded-xl shadow-xl" />
           <button
             type="button"
             aria-label="Fechar foto"
@@ -398,10 +398,10 @@ function NovaNcModal({
         body: JSON.stringify({ ...form, projectName: obra?.name }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Falha ao registrar a não conformidade.");
+      if (!res.ok) throw new Error(data.error || "Falha ao registrar a oportunidade de melhoria.");
       onSaved(data.email ?? { sent: false, reason: "resultado do envio desconhecido." }, form.responsavelEmail!.trim());
     } catch (e) {
-      setErroGeral(e instanceof Error ? e.message : "Falha ao registrar a não conformidade.");
+      setErroGeral(e instanceof Error ? e.message : "Falha ao registrar a oportunidade de melhoria.");
     } finally {
       setSalvando(false);
     }
@@ -423,7 +423,7 @@ function NovaNcModal({
         <div className="flex-none px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">Qualidade</span>
-            <h2 id="nova-nc-titulo" className="text-[15px] font-semibold text-slate-900 mt-0.5">Nova não conformidade</h2>
+            <h2 id="nova-nc-titulo" className="text-[15px] font-semibold text-slate-900 mt-0.5">Nova oportunidade de melhoria</h2>
           </div>
           <button
             type="button"
@@ -461,7 +461,7 @@ function NovaNcModal({
                 {erro("projectId")}
               </div>
               <div>
-                <label htmlFor="nc-tipo" className={labelClass}>Tipo da NC *</label>
+                <label htmlFor="nc-tipo" className={labelClass}>Tipo da OM *</label>
                 <select
                   id="nc-tipo"
                   value={form.tipo ?? ""}
@@ -511,7 +511,7 @@ function NovaNcModal({
           </section>
 
           <section className="space-y-4">
-            <h3 className="text-[13px] font-semibold text-slate-900">Descrição da NC</h3>
+            <h3 className="text-[13px] font-semibold text-slate-900">Descrição da OM</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="nc-local" className={labelClass}>Local da obra *</label>
@@ -540,7 +540,7 @@ function NovaNcModal({
                 <input
                   id="nc-titulo"
                   maxLength={255}
-                  placeholder="Resumo curto da não conformidade"
+                  placeholder="Resumo curto da oportunidade de melhoria"
                   value={form.titulo ?? ""}
                   onChange={(e) => set("titulo", e.target.value)}
                   className={campo("titulo")}
@@ -548,7 +548,7 @@ function NovaNcModal({
                 {erro("titulo")}
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="nc-descricao" className={labelClass}>Descrição da NC *</label>
+                <label htmlFor="nc-descricao" className={labelClass}>Descrição da OM *</label>
                 <textarea
                   id="nc-descricao"
                   rows={4}
@@ -560,7 +560,7 @@ function NovaNcModal({
                 {erro("descricao")}
               </div>
               <div className="sm:col-span-2">
-                <span className={labelClass}>Foto da NC</span>
+                <span className={labelClass}>Foto da OM</span>
                 {form.fotoUrl ? (
                   <div className="flex items-start gap-3">
                     <img src={form.fotoUrl} alt="Pré-visualização da foto" className="w-40 h-28 object-cover rounded-xl border border-slate-200" />
@@ -644,7 +644,7 @@ function NovaNcModal({
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button onClick={() => void salvar()} loading={salvando} disabled={processandoFoto}>
             <CheckCircle2 className="w-4 h-4" />
-            Registrar NC
+            Registrar OM
           </Button>
         </div>
       </div>

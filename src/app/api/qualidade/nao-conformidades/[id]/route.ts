@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     return NextResponse.json({ naoConformidade: await getNaoConformidadeDetail(await parseIdParam(params)) });
   } catch (error) {
-    return errorResponse(error, "Falha ao carregar a não conformidade.", "GET /api/qualidade/nao-conformidades/[id]");
+    return errorResponse(error, "Falha ao carregar a oportunidade de melhoria.", "GET /api/qualidade/nao-conformidades/[id]");
   }
 }
 
@@ -25,6 +25,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const naoConformidade = await resolveNaoConformidade(id, defaultNaoConformidadeRepository, await requireAdmin());
     return NextResponse.json({ naoConformidade });
   } catch (error) {
-    return errorResponse(error, "Falha ao atualizar a não conformidade.", "PATCH /api/qualidade/nao-conformidades/[id]");
+    return errorResponse(error, "Falha ao atualizar a oportunidade de melhoria.", "PATCH /api/qualidade/nao-conformidades/[id]");
   }
 }

@@ -41,7 +41,7 @@ const formatarData = (iso: string) => {
 const escapeHtml = (v: string) =>
   v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-export const numeroNc = (id: number) => `NC-${String(id).padStart(4, "0")}`;
+export const numeroNc = (id: number) => `OM-${String(id).padStart(4, "0")}`;
 
 export function buildNcNotificationEmail(nc: NcNotificationData, remetente = "Setor de Qualidade e SST"): EmailMessage {
   const numero = numeroNc(nc.id);
@@ -49,7 +49,7 @@ export function buildNcNotificationEmail(nc: NcNotificationData, remetente = "Se
   const foto = nc.fotoUrl ? parseImageDataUrl(nc.fotoUrl) : null;
 
   const campos: [string, string][] = [
-    ["Número da NC", numero],
+    ["Número da OM", numero],
     ["Título", nc.titulo],
     ["Obra", obra],
     ["Local", nc.localObra],
@@ -61,12 +61,12 @@ export function buildNcNotificationEmail(nc: NcNotificationData, remetente = "Se
   ];
 
   const abertura =
-    `Comunicamos que foi registrada uma Não Conformidade na obra ${obra}, sob sua responsabilidade, ` +
+    `Comunicamos que foi registrada uma Oportunidade de Melhoria na obra ${obra}, sob sua responsabilidade, ` +
     `identificada como "${nc.titulo}". Seguem abaixo os dados do registro:`;
   const solicitacao =
-    `Solicitamos que sejam adotadas as ações corretivas necessárias para o tratamento desta não conformidade ` +
+    `Solicitamos que sejam adotadas as ações corretivas necessárias para o tratamento desta oportunidade de melhoria ` +
     `até ${formatarData(nc.prazo)}, bem como o registro das evidências de sua resolução no sistema.`;
-  const anexo = foto ? "Segue em anexo o registro fotográfico da não conformidade." : null;
+  const anexo = foto ? "Segue em anexo o registro fotográfico da oportunidade de melhoria." : null;
 
   const text = [
     `Prezado(a) ${nc.responsavelNome},`,
@@ -101,7 +101,7 @@ export function buildNcNotificationEmail(nc: NcNotificationData, remetente = "Se
   const html = `<!doctype html>
 <html lang="pt-BR"><body style="margin:0;padding:24px;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#0f172a">
 <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:28px">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#64748b">Notificação de Não Conformidade · ${escapeHtml(numero)}</p>
+<p style="margin:0 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#64748b">Notificação de Oportunidade de Melhoria · ${escapeHtml(numero)}</p>
 <h1 style="margin:0 0 20px;font-size:18px">${escapeHtml(nc.titulo)}</h1>
 <p>Prezado(a) ${escapeHtml(nc.responsavelNome)},</p>
 <p>${escapeHtml(abertura)}</p>
@@ -115,7 +115,7 @@ ${foto ? `<p>${escapeHtml(anexo!)}</p><img src="cid:${attachments[0].cid}" alt="
 
   return {
     to: nc.responsavelEmail.trim(),
-    subject: `Notificação de Não Conformidade ${numero} – ${nc.titulo}`,
+    subject: `Notificação de Oportunidade de Melhoria ${numero} – ${nc.titulo}`,
     text,
     html,
     attachments,

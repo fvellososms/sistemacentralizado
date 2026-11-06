@@ -77,22 +77,22 @@ export function validateNaoConformidade(
   const errors: NaoConformidadeErrors = {};
 
   if (!input.projectId || input.projectId <= 0) errors.projectId = "Selecione a obra.";
-  if (!input.tipo || !(input.tipo in NC_TIPOS)) errors.tipo = "Selecione o tipo da NC.";
-  if (!input.grau || !(input.grau in NC_GRAUS)) errors.grau = "Selecione o grau da NC.";
+  if (!input.tipo || !(input.tipo in NC_TIPOS)) errors.tipo = "Selecione o tipo da OM.";
+  if (!input.grau || !(input.grau in NC_GRAUS)) errors.grau = "Selecione o grau da OM.";
 
   if (!isValidDate(input.dataOcorrencia)) errors.dataOcorrencia = "Informe a data da ocorrência.";
   else if (input.dataOcorrencia > hoje) errors.dataOcorrencia = "A data da ocorrência não pode ser futura.";
 
   if (!filled(input.localObra)) errors.localObra = "Informe o local da obra.";
   if (!filled(input.requisitoViolado)) errors.requisitoViolado = "Informe o requisito violado.";
-  if (!filled(input.titulo)) errors.titulo = "Informe o título da NC.";
-  if (!filled(input.descricao)) errors.descricao = "Descreva a NC (o que, onde e quando).";
+  if (!filled(input.titulo)) errors.titulo = "Informe o título da OM.";
+  if (!filled(input.descricao)) errors.descricao = "Descreva a OM (o que, onde e quando).";
   if (!filled(input.responsavelNome)) errors.responsavelNome = "Informe o responsável pela obra.";
 
   if (!filled(input.responsavelEmail)) errors.responsavelEmail = "Informe o e-mail do responsável.";
   else if (!EMAIL_RE.test(input.responsavelEmail!.trim())) errors.responsavelEmail = "E-mail inválido.";
 
-  if (!isValidDate(input.prazo)) errors.prazo = "Informe o prazo para resolver a NC.";
+  if (!isValidDate(input.prazo)) errors.prazo = "Informe o prazo para resolver a OM.";
   else if (isValidDate(input.dataOcorrencia) && input.prazo < input.dataOcorrencia)
     errors.prazo = "O prazo não pode ser anterior à data da ocorrência.";
 

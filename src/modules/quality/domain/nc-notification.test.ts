@@ -24,14 +24,14 @@ const nc: NcNotificationData = {
 
 describe("NC notification e-mail", () => {
   it("formats the NC number", () => {
-    assert.equal(numeroNc(7), "NC-0007");
-    assert.equal(numeroNc(12345), "NC-12345");
+    assert.equal(numeroNc(7), "OM-0007");
+    assert.equal(numeroNc(12345), "OM-12345");
   });
 
   it("addresses the manager with every NC detail", () => {
     const msg = buildNcNotificationEmail(nc);
     assert.equal(msg.to, "roberto@exemplo.com.br");
-    assert.equal(msg.subject, "Notificação de Não Conformidade NC-0007 – Abertura de poço sem guarda-corpo");
+    assert.equal(msg.subject, "Notificação de Oportunidade de Melhoria OM-0007 – Abertura de poço sem guarda-corpo");
     assert.match(msg.text, /^Prezado\(a\) Eng\. Roberto Albuquerque,/);
     for (const trecho of [
       "Residencial Aurora",
@@ -60,7 +60,7 @@ describe("NC notification e-mail", () => {
     const msg = buildNcNotificationEmail({ ...nc, fotoUrl: PNG_1PX }, "Qualidade FVelloso");
     assert.equal(msg.attachments.length, 1);
     const [anexo] = msg.attachments;
-    assert.equal(anexo.filename, "NC-0007.png");
+    assert.equal(anexo.filename, "OM-0007.png");
     assert.equal(anexo.contentType, "image/png");
     assert.ok(msg.html.includes(`cid:${anexo.cid}`));
     assert.ok(msg.text.includes("Segue em anexo o registro fotográfico"));

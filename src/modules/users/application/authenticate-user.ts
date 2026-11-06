@@ -3,10 +3,12 @@ import { DATABASE_UNAVAILABLE_MESSAGE, isDatabaseUnavailableError } from "@/shar
 import { burnPasswordCheck, hashPassword, isPasswordHash, verifyPassword } from "@/shared/security/password";
 import { recordAudit } from "@/modules/audit/server";
 import { isBootstrapAdmin, isLocked, legacyPasswordDecision, minutesUntilUnlock, registerFailedLogin } from "../domain/access";
+import { LOGIN_IP_RULES } from "../domain/rate-limit";
 import { normalizeEmail, validateLoginCredentialsInput } from "../domain/rules";
 import type { UserProfile } from "../domain/types";
 import { defaultUserRepository, type UserRepository, type UserRow } from "../infrastructure/user-repository";
 import { getFallbackPasswords, getFallbackProfile } from "../infrastructure/profile-fallback-store";
+import { enforceRateLimit } from "./rate-limit";
 import { MAIN_ADMIN_EMAIL } from "./session";
 import { toUserProfile } from "./user-mapper";
 
@@ -94,4 +96,21 @@ export async function authenticateUser(
   });
 
   return toUserProfile(updated ?? user);
+}
+
+/**
+ * Login entry point: limits attempts per address before spending any time on the password.
+ * Only attempts that tested a password and failed stay counted (401, 403 and 423).
+ */
+export async function authenticateWithRateLimit(input: AuthenticateUserInput, address: string): Promise<UserProfile> {
+  const attempt = await enforceRateLimit(LOGIN_IP_RULES, address);
+  try {
+    const profile = await authenticateUser(input);
+    await attempt.release();
+    return profile;
+  } catch (error) {
+    const passwordRejected = error instanceof AppError && [401, 403, 423].includes(error.statusCode);
+    if (!passwordRejected) await attempt.release();
+    throw error;
+  }
 }

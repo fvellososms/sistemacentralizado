@@ -3,10 +3,12 @@ import { withDatabase } from "@/shared/errors/with-database";
 import { hashPassword, verifyPassword } from "@/shared/security/password";
 import { recordAudit } from "@/modules/audit/server";
 import { isBootstrapAdmin, validatePasswordStrength } from "../domain/access";
+import { PASSWORD_CHANGE_RULES } from "../domain/rate-limit";
 import { isValidAvatarUrl, normalizeEmail } from "../domain/rules";
 import type { UserProfile } from "../domain/types";
 import { defaultUserRepository, type UserRepository } from "../infrastructure/user-repository";
 import { saveFallbackProfile } from "../infrastructure/profile-fallback-store";
+import { enforceRateLimit } from "./rate-limit";
 import { MAIN_ADMIN_EMAIL, type SessionUser } from "./session";
 import { toUserProfile } from "./user-mapper";
 
@@ -37,8 +39,10 @@ export async function changeOwnPassword(
   return withDatabase(async () => {
     const row = await repo.findById(session.id);
     if (!row) throw AppError.unauthorized("Usuário não encontrado. Entre novamente.");
+    const attempt = await enforceRateLimit(PASSWORD_CHANGE_RULES, `usuario:${row.id}`);
     if (!(await verifyPassword(row.passwordHash, currentPassword ?? "")).valid)
       throw AppError.badRequest("A senha atual não confere.");
+    await attempt.release();
     const weak = validatePasswordStrength(newPassword, row.email);
     if (weak) throw AppError.badRequest(weak);
     if ((await verifyPassword(row.passwordHash, newPassword)).valid)

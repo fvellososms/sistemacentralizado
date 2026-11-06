@@ -13,6 +13,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const result = await executeNcAction(await parseIdParam(params), await request.json(), await requireSession());
     return NextResponse.json(result);
   } catch (error) {
-    return errorResponse(error, "Falha ao atualizar a não conformidade.", "POST /api/qualidade/nao-conformidades/[id]/fluxo");
+    return errorResponse(error, "Falha ao atualizar a oportunidade de melhoria.", "POST /api/qualidade/nao-conformidades/[id]/fluxo");
   }
 }

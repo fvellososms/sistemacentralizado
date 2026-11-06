@@ -312,7 +312,7 @@ function UserFormModal({
               >
                 <span className="block text-[13px] font-semibold text-slate-900">{ACCESS_LEVELS[level]}</span>
                 <span className="block text-[11.5px] text-slate-500">
-                  {level === "admin" ? "Gerencia usuários, empresas, obras e verifica NCs" : "Usa o sistema no dia a dia"}
+                  {level === "admin" ? "Gerencia usuários, empresas, obras e verifica OMs" : "Usa o sistema no dia a dia"}
                 </span>
               </button>
             ))}

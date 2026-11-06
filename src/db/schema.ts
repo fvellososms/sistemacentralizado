@@ -1,4 +1,4 @@
-import { pgTable, serial, text, varchar, integer, boolean, timestamp, numeric, date, real, pgEnum, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, varchar, integer, bigint, boolean, timestamp, numeric, date, real, pgEnum, uniqueIndex, index } from "drizzle-orm/pg-core";
 
 // Empresas clientes da consultoria; cada obra pertence a uma empresa cliente.
 export const clientCompanies = pgTable("client_companies", {
@@ -469,4 +469,11 @@ export const workspaceTasks = pgTable("workspace_tasks", {
   stageChangedAt: timestamp("stage_changed_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Brute-force counters. `key` holds a hash of the address/account, never the address itself.
+export const rateLimits = pgTable("rate_limits", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  count: integer("count").notNull().default(0),
+  resetAt: bigint("reset_at", { mode: "number" }).notNull(), // unix seconds
 });

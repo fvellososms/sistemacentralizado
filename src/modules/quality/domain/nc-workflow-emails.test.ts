@@ -16,7 +16,7 @@ describe("NC workflow e-mails", () => {
   it("builds deadline reminders", () => {
     const soon = buildNcLembreteEmail(nc, "prazo_proximo", "2026-11-05");
     assert.equal(soon.to, "roberto@x.com");
-    assert.match(soon.subject, /^Lembrete de prazo: NC-0012/);
+    assert.match(soon.subject, /^Lembrete de prazo: OM-0012/);
     assert.match(soon.text, /vence em 2 dia\(s\), em 07\/11\/2026/);
     const late = buildNcLembreteEmail(nc, "vencida", "2026-11-10");
     assert.match(late.subject, /^Prazo vencido/);

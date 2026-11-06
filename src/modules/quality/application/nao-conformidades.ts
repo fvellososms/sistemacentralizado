@@ -54,7 +54,7 @@ export async function listNaoConformidades(
 
 export async function getNaoConformidadeDetail(id: number, repo: NaoConformidadeRepository = defaultNaoConformidadeRepository) {
   const nc = await repo.findById(id);
-  if (!nc) throw AppError.notFound("Não conformidade não encontrada.");
+  if (!nc) throw AppError.notFound("Oportunidade de melhoria não encontrada.");
   const [acoes, eventos] = await Promise.all([repo.listAcoes([id]), repo.listEventos(id)]);
   return { ...withStatus(nc), porques: parsePorques(nc.porques), acoes, eventos };
 }
@@ -88,10 +88,10 @@ export async function resolveNaoConformidade(
   actor?: SessionUser | null
 ) {
   const existing = await repo.findById(id);
-  if (!existing) throw AppError.notFound("Não conformidade não encontrada.");
+  if (!existing) throw AppError.notFound("Oportunidade de melhoria não encontrada.");
   if (normalizeNcStatus(existing.status) === "encerrada") return existing;
   const updated = await repo.markResolved(id);
-  if (!updated) throw AppError.internal("Não foi possível atualizar a não conformidade.");
+  if (!updated) throw AppError.internal("Não foi possível atualizar a oportunidade de melhoria.");
   await repo.addEvento(id, "encerrada", "Encerramento direto, sem verificação registrada.", actor?.name ?? null);
   return updated;
 }
@@ -124,7 +124,7 @@ export async function executeNcAction(
 ) {
   return withDatabase(async () => {
     const nc = await repo.findById(id);
-    if (!nc) throw AppError.notFound("Não conformidade não encontrada.");
+    if (!nc) throw AppError.notFound("Oportunidade de melhoria não encontrada.");
     const acoes = await repo.listAcoes([id]);
     const acao = body.acao;
     if (!acao) throw AppError.badRequest("Informe a ação.");
@@ -165,7 +165,7 @@ export async function executeNcAction(
       }
       case "concluir_acao": {
         const alvo = acoes.find((a) => a.id === body.acaoId);
-        if (!alvo) throw AppError.notFound("Ação não encontrada nesta NC.");
+        if (!alvo) throw AppError.notFound("Ação não encontrada nesta OM.");
         if (alvo.status === "concluida") throw invalid("Esta ação já foi concluída.");
         const erro = validateConclusaoAcao(body);
         if (erro) throw invalid(erro);

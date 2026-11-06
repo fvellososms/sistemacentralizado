@@ -35,22 +35,22 @@ export const NC_CAUSA_METODOS = {
 export type NcCausaMetodo = keyof typeof NC_CAUSA_METODOS;
 
 export const NC_VERIFICACAO_RESULTADOS = {
-  eficaz: "Eficaz — encerrar a NC",
+  eficaz: "Eficaz — encerrar a OM",
   ineficaz: "Ineficaz — reabrir o tratamento",
 } as const;
 
 export type NcVerificacaoResultado = keyof typeof NC_VERIFICACAO_RESULTADOS;
 
 export const NC_EVENTOS = {
-  criada: "NC registrada",
+  criada: "OM registrada",
   plano_definido: "Análise de causa e plano de ação definidos",
   plano_atualizado: "Plano de ação atualizado",
   acao_concluida: "Ação concluída",
   enviada_verificacao: "Enviada para verificação de eficácia",
-  encerrada: "NC encerrada (ação eficaz)",
+  encerrada: "OM encerrada (ação eficaz)",
   reaberta: "Tratamento reaberto (ação ineficaz)",
   prazo_prorrogado: "Prazo prorrogado",
-  cancelada: "NC cancelada",
+  cancelada: "OM cancelada",
   lembrete_enviado: "Lembrete de prazo enviado",
 } as const;
 
@@ -174,7 +174,7 @@ export function canPerformNcAction(
 ): { allowed: boolean; reason?: string } {
   const status = normalizeNcStatus(nc.status);
   if (NC_FLUXO_ACOES_ADMIN.includes(acao) && !isAdmin) return { allowed: false, reason: "Somente o administrador (SMS) pode fazer isso." };
-  if (NC_STATUS_FINAIS.includes(status)) return { allowed: false, reason: `A NC está ${NC_STATUS[status].toLowerCase()}.` };
+  if (NC_STATUS_FINAIS.includes(status)) return { allowed: false, reason: `A OM está ${NC_STATUS[status].toLowerCase()}.` };
 
   switch (acao) {
     case "definir_plano":
@@ -184,14 +184,14 @@ export function canPerformNcAction(
     case "concluir_acao":
       return status === "em_tratamento" ? { allowed: true } : { allowed: false, reason: "Defina o plano de ação antes de concluir ações." };
     case "enviar_verificacao": {
-      if (status !== "em_tratamento") return { allowed: false, reason: "A NC precisa estar em tratamento." };
+      if (status !== "em_tratamento") return { allowed: false, reason: "A OM precisa estar em tratamento." };
       const acoes = nc.acoes ?? [];
       if (!acoes.length) return { allowed: false, reason: "O plano de ação não tem ações." };
       const pendentes = acoes.filter((a) => a.status !== "concluida").length;
       return pendentes ? { allowed: false, reason: `Ainda há ${pendentes} ação(ões) pendente(s).` } : { allowed: true };
     }
     case "verificar":
-      return status === "aguardando_verificacao" ? { allowed: true } : { allowed: false, reason: "A NC não está aguardando verificação." };
+      return status === "aguardando_verificacao" ? { allowed: true } : { allowed: false, reason: "A OM não está aguardando verificação." };
     case "prorrogar":
     case "cancelar":
       return { allowed: true };

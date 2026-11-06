@@ -57,6 +57,13 @@
       "when": 1793895761155,
       "tag": "0007_visitas_colaboradores",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793977759262,
+      "tag": "0008_limite_tentativas",
+      "breakpoints": true
     }
   ]
 }

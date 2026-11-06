@@ -3,7 +3,10 @@ import { AppError } from "@/shared/errors/AppError";
 
 /** JSON error response for route handlers: AppError keeps its status and message, anything else is a 500. */
 export function errorResponse(error: unknown, fallbackMessage: string, logLabel: string) {
-  if (error instanceof AppError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+  if (error instanceof AppError) {
+    const headers = error.retryAfterSeconds ? { "Retry-After": String(error.retryAfterSeconds) } : undefined;
+    return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode, headers });
+  }
   console.error(`${logLabel}:`, error);
   return NextResponse.json({ error: fallbackMessage }, { status: 500 });
 }

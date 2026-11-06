@@ -16,9 +16,9 @@ export const AUDIT_ACTIONS = {
   company_updated: "Empresa cliente alterada",
   project_created: "Obra cadastrada",
   project_updated: "Obra alterada",
-  nc_verified: "Eficácia de NC verificada",
-  nc_canceled: "NC cancelada",
-  nc_deadline_extended: "Prazo de NC prorrogado",
+  nc_verified: "Eficácia de OM verificada",
+  nc_canceled: "OM cancelada",
+  nc_deadline_extended: "Prazo de OM prorrogado",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
@@ -27,7 +27,7 @@ export const AUDIT_ENTITIES = {
   user: "Usuário",
   company: "Empresa cliente",
   project: "Obra",
-  nc: "Não conformidade",
+  nc: "Oportunidade de melhoria",
 } as const;
 
 export type AuditEntity = keyof typeof AUDIT_ENTITIES;

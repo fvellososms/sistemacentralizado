@@ -50,10 +50,10 @@ export function buildNcLembreteEmail(nc: NcEmailData, tipo: NcLembrete, hoje: st
   return message(
     nc.responsavelEmail,
     `${tipo === "vencida" ? "Prazo vencido" : "Lembrete de prazo"}: ${numero} – ${nc.titulo}`,
-    `Lembrete de Não Conformidade · ${numero}`,
+    `Lembrete de Oportunidade de Melhoria · ${numero}`,
     [
       `Prezado(a) ${nc.responsavelNome},`,
-      `A não conformidade ${numero} "${nc.titulo}", registrada na ${obra} (${nc.localObra}), ${situacao}.`,
+      `A oportunidade de melhoria ${numero} "${nc.titulo}", registrada na ${obra} (${nc.localObra}), ${situacao}.`,
       tipo === "vencida"
         ? "Solicitamos a conclusão imediata das ações do plano e o registro das evidências no sistema. Caso precise de mais prazo, solicite a prorrogação ao setor de SMS com a devida justificativa."
         : "Solicitamos concluir as ações do plano e registrar as evidências no sistema dentro do prazo.",
@@ -67,10 +67,10 @@ export function buildNcVerificacaoEmail(nc: NcEmailData, adminEmail: string, env
   return message(
     adminEmail,
     `Verificação de eficácia pendente: ${numero} – ${nc.titulo}`,
-    `Não Conformidade aguardando verificação · ${numero}`,
+    `Oportunidade de Melhoria aguardando verificação · ${numero}`,
     [
-      `Todas as ações do plano da não conformidade ${numero} "${nc.titulo}" (${nc.projectName ?? "obra"} · ${nc.localObra}) foram concluídas e enviadas para verificação por ${enviadoPor}.`,
-      "Acesse o sistema para verificar a eficácia das ações e encerrar a NC, ou reabrir o tratamento se as ações não forem eficazes.",
+      `Todas as ações do plano da oportunidade de melhoria ${numero} "${nc.titulo}" (${nc.projectName ?? "obra"} · ${nc.localObra}) foram concluídas e enviadas para verificação por ${enviadoPor}.`,
+      "Acesse o sistema para verificar a eficácia das ações e encerrar a OM, ou reabrir o tratamento se as ações não forem eficazes.",
     ],
     "Sistema FVelloso SMS"
   );

@@ -99,7 +99,7 @@ function NcDocument({
 
   return (
     <DocumentShell
-      title="Relatório de Não Conformidade"
+      title="Relatório de Oportunidade de Melhoria"
       subtitle={`${nc.projectName ?? "Obra"} · ${nc.titulo}`}
       code={code}
       issuedOn={formatDocumentDate(nc.createdAt ?? nc.dataOcorrencia)}
@@ -109,7 +109,7 @@ function NcDocument({
           fields={[
             { label: "Obra", value: nc.projectName ?? "—", span: 2 },
             { label: "Código da obra", value: projectCode ?? "—" },
-            { label: "Nº da NC", value: code },
+            { label: "Nº da OM", value: code },
             { label: "Tipo", value: NC_TIPOS[nc.tipo] ?? nc.tipo, span: 2 },
             { label: "Grau", value: <Tag label={NC_GRAUS[nc.grau] ?? nc.grau} tone={GRAU_TONE[nc.grau] ?? "neutral"} /> },
             { label: "Situação", value: <Tag label={NC_SITUACOES_FLUXO[situacao]} tone={SITUACAO_TONE[situacao]} /> },
@@ -119,7 +119,7 @@ function NcDocument({
         />
       </Section>
 
-      <Section number={2} title="Descrição da não conformidade">
+      <Section number={2} title="Descrição da oportunidade de melhoria">
         <View wrap={false}>
           <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.4, color: COLORS.ink, marginBottom: 4 }}>{nc.titulo}</Text>
           <TextBox>{nc.descricao}</TextBox>
@@ -134,7 +134,7 @@ function NcDocument({
           <View style={{ borderWidth: 0.6, borderColor: COLORS.border, padding: 6, alignItems: "center" }} wrap={false}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt */}
             <Image src={resolveAssetUrl(nc.fotoUrl)} style={{ maxWidth: "100%", maxHeight: 300, objectFit: "contain" }} />
-            <Text style={[mutedText, { marginTop: 4 }]}>Registro da não conformidade em {formatDocumentDate(nc.dataOcorrencia)}.</Text>
+            <Text style={[mutedText, { marginTop: 4 }]}>Registro da oportunidade de melhoria em {formatDocumentDate(nc.dataOcorrencia)}.</Text>
           </View>
         </Section>
       ) : null}
@@ -233,7 +233,7 @@ function NcDocument({
           </Section>
         </>
       ) : (
-        <Section number={++n} title="Tratamento da não conformidade">
+        <Section number={++n} title="Tratamento da oportunidade de melhoria">
           <Text style={[mutedText, { marginBottom: 3 }]}>Análise de causa e ação corretiva adotada (preenchimento pelo responsável):</Text>
           <WriteInArea lines={5} />
           <Text style={[mutedText, { marginTop: 8, marginBottom: 3 }]}>Verificação de eficácia (preenchimento pelo SMS):</Text>
@@ -278,7 +278,7 @@ function NcDocument({
 }
 
 export async function buildNcPdf(nc: NcPdfData, today: string, projectCode?: string | null): Promise<PdfJob> {
-  const code = buildDocumentCode("NC", projectCode, nc.id);
+  const code = buildDocumentCode("OM", projectCode, nc.id);
   const safeFotoUrl = nc.fotoUrl ? await preparePhotoUrlForPdf(nc.fotoUrl) : null;
   const normalizedNc: NcPdfData = { ...nc, fotoUrl: safeFotoUrl };
   return {
@@ -291,6 +291,6 @@ export async function buildNcPdf(nc: NcPdfData, today: string, projectCode?: str
 export async function fetchNcPdf(ncId: number, today: string, projectCode?: string | null): Promise<PdfJob> {
   const res = await fetch(`/api/qualidade/nao-conformidades/${ncId}`);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.naoConformidade) throw new Error(data.error || "Não conformidade não encontrada.");
+  if (!res.ok || !data.naoConformidade) throw new Error(data.error || "Oportunidade de melhoria não encontrada.");
   return buildNcPdf(data.naoConformidade, today, projectCode);
 }
