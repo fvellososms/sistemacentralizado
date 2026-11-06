@@ -1,22 +1,28 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
+import { useTaskBoardSummary } from "@/components/workspace/api";
+import { MobileMoreSheet } from "./MobileMoreSheet";
 import {
   LayoutDashboard,
   FileSpreadsheet,
   Plus,
-  CalendarDays,
+  Menu,
   AlertTriangle,
 } from "lucide-react";
 
 export function BottomNav() {
   const pathname = usePathname();
   const { openCreateModal } = useApp();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const lateTasks = useTaskBoardSummary()?.late ?? 0;
 
   return (
+    <>
+    {menuOpen && <MobileMoreSheet onClose={() => setMenuOpen(false)} />}
     <nav className="md:hidden fixed bottom-4 left-3 right-3 z-40">
       <div
         className="relative flex items-center justify-between px-2 py-2 rounded-3xl shadow-2xl shadow-slate-900/30 backdrop-blur-xl border border-white/10 text-white"
@@ -66,19 +72,6 @@ export function BottomNav() {
         </div>
 
         <Link
-          href="/rso"
-          className={`flex flex-col items-center justify-center w-14 py-1.5 rounded-2xl transition ${
-            pathname === "/rso" ? "text-white" : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <CalendarDays
-            className="w-[20px] h-[20px]"
-            strokeWidth={pathname === "/rso" ? 2.2 : 1.7}
-          />
-          <span className="text-[10px] mt-0.5 font-medium">Semanal</span>
-        </Link>
-
-        <Link
           href="/apr"
           className={`flex flex-col items-center justify-center w-14 py-1.5 rounded-2xl transition ${
             pathname.startsWith("/apr") ? "text-white" : "text-slate-400 hover:text-white"
@@ -90,7 +83,20 @@ export function BottomNav() {
           />
           <span className="text-[10px] mt-0.5 font-medium">APR</span>
         </Link>
+
+        {/* RSO, Qualidade, Espaço de trabalho, Administração and Perfil live in this sheet on phones. */}
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-expanded={menuOpen}
+          className={`relative flex flex-col items-center justify-center w-14 py-1.5 rounded-2xl transition ${menuOpen ? "text-white" : "text-slate-400 hover:text-white"}`}
+        >
+          <Menu className="w-[20px] h-[20px]" strokeWidth={1.7} />
+          <span className="text-[10px] mt-0.5 font-medium">Mais</span>
+          {lateTasks > 0 && <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-500" aria-label="Há tarefas atrasadas" />}
+        </button>
       </div>
     </nav>
+    </>
   );
 }

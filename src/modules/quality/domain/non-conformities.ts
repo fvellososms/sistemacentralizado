@@ -39,11 +39,16 @@ export interface NaoConformidadeInput {
   responsavelNome: string;
   responsavelEmail: string;
   prazo: string; // YYYY-MM-DD
+  fotoUrl?: string | null; // optional photo as an image data URL (base64)
 }
 
 export type NaoConformidadeErrors = Partial<Record<keyof NaoConformidadeInput, string>>;
 
+/** Largest accepted photo after decoding (bytes). */
+export const NC_FOTO_MAX_BYTES = 5 * 1024 * 1024;
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const IMAGE_DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const isValidDate = (v: unknown): v is string =>
@@ -51,8 +56,17 @@ const isValidDate = (v: unknown): v is string =>
 
 const filled = (v: unknown) => typeof v === "string" && v.trim().length > 0;
 
+/** Splits an image data URL into mime type and base64 payload; null when it is not a supported image. */
+export function parseImageDataUrl(dataUrl: string): { mimeType: string; base64: string; bytes: number } | null {
+  const match = IMAGE_DATA_URL_RE.exec(dataUrl);
+  if (!match) return null;
+  const base64 = match[2];
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return { mimeType: match[1], base64, bytes: (base64.length * 3) / 4 - padding };
+}
+
 /**
- * Validates a new NC. Every field is mandatory; the deadline cannot be earlier than
+ * Validates a new NC. Every field except the photo is mandatory; the deadline cannot be earlier than
  * the occurrence date and the occurrence cannot be in the future.
  * `hoje` (YYYY-MM-DD) is injected to keep the rule deterministic.
  */
@@ -81,6 +95,12 @@ export function validateNaoConformidade(
   if (!isValidDate(input.prazo)) errors.prazo = "Informe o prazo para resolver a NC.";
   else if (isValidDate(input.dataOcorrencia) && input.prazo < input.dataOcorrencia)
     errors.prazo = "O prazo não pode ser anterior à data da ocorrência.";
+
+  if (input.fotoUrl) {
+    const foto = parseImageDataUrl(input.fotoUrl);
+    if (!foto) errors.fotoUrl = "A foto deve ser uma imagem JPEG, PNG ou WebP.";
+    else if (foto.bytes > NC_FOTO_MAX_BYTES) errors.fotoUrl = "A foto excede o tamanho máximo de 5 MB.";
+  }
 
   return { isValid: Object.keys(errors).length === 0, errors };
 }

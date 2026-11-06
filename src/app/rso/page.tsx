@@ -5,7 +5,6 @@ import { AppLayout } from "@/components/AppLayout";
 import { useApp } from "@/context/AppContext";
 import {
   CalendarDays,
-  Printer,
   FileSpreadsheet,
   Users,
   Clock,
@@ -18,6 +17,8 @@ import {
   Plus,
 } from "lucide-react";
 import { PhotoCard } from "@/components/PhotoCard";
+import { PdfDownloadButton } from "@/components/documents/PdfDownloadButton";
+import { extractErrorMessage, notifySite } from "@/components/ui";
 
 export default function RsoPage() {
   const { activeProject } = useApp();
@@ -60,9 +61,13 @@ export default function RsoPage() {
         `/api/rso?projectId=${activeProject.id}&startDate=${weekInfo.startDate}&endDate=${weekInfo.endDate}`
       );
       const json = await res.json();
+      if (!res.ok) {
+        notifySite(json.error || "Não foi possível carregar o Relatório Semanal.", "danger");
+        return;
+      }
       setData(json);
     } catch (err) {
-      console.error(err);
+      notifySite(extractErrorMessage(err, "Erro ao carregar Relatório Semanal."), "danger");
     } finally {
       setLoading(false);
     }
@@ -71,10 +76,6 @@ export default function RsoPage() {
   useEffect(() => {
     fetchRsoData();
   }, [activeProject, selectedWeekOffset]);
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,13 +133,11 @@ export default function RsoPage() {
               Manual
             </button>
 
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-medium text-white bg-slate-900 hover:bg-slate-800 transition active:scale-[0.98] shadow-sm"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Imprimir / PDF</span>
-            </button>
+            <PdfDownloadButton
+              variant="primary"
+              disabled={loading || !data?.summary}
+              build={async () => (await import("@/components/documents/rso-document")).buildRsoPdf(data, activeProject)}
+            />
           </div>
         </div>
 
@@ -259,7 +258,7 @@ export default function RsoPage() {
                 </div>
               ) : (
                 <div className="p-10 text-center text-slate-400 text-[12.5px]">
-                  Nenhum registro nesta semana. Use o botão "Manual" para preencher.
+                  Nenhum registro nesta semana. Use o botão “Manual” para preencher.
                 </div>
               )}
             </div>

@@ -2,12 +2,14 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { safeNextPath } from "@/shared/security/route-access";
 import Image from "next/image";
 import { Lock, Mail, ShieldAlert, ArrowRight, Eye, EyeOff } from "lucide-react";
 
 import logo from "@/assets/images/logofvelloso.png";
 
 import { useApp } from "@/context/AppContext";
+import { DEFAULT_PROFILE, mergeUserProfile, parseStoredUserSession } from "@/modules/users";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +19,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Already logged users never see this page: the proxy redirects them using the session cookie.
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,29 +45,40 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.profile) {
+      if (typeof window !== "undefined") {
+        const previousSession = parseStoredUserSession(localStorage.getItem("rdo_user_session"));
+        const resolvedAvatar =
+          data.profile?.avatarUrl === DEFAULT_PROFILE.avatarUrl &&
+          previousSession?.avatarUrl &&
+          previousSession.avatarUrl !== DEFAULT_PROFILE.avatarUrl
+            ? previousSession.avatarUrl
+            : data.profile?.avatarUrl;
+
+        const sessionPayload = {
+          ...(data.profile || {}),
+          email: data.profile?.email || email,
+          name: data.profile?.name || "Alberto Martins",
+          role: data.profile?.role || "Encarregado Geral de Obra",
+          avatarUrl: resolvedAvatar || data.profile?.avatarUrl || DEFAULT_PROFILE.avatarUrl,
+          loggedAt: new Date().toISOString(),
+        };
+
+        localStorage.setItem("rdo_user_session", JSON.stringify(sessionPayload));
+        setProfile(mergeUserProfile(DEFAULT_PROFILE, sessionPayload));
+      } else if (data.profile) {
         setProfile(data.profile);
       }
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "rdo_user_session",
-          JSON.stringify({
-            email: data.profile?.email || email,
-            name: data.profile?.name || "Alberto Martins",
-            role: data.profile?.role || "Encarregado Geral de Obra",
-            loggedAt: new Date().toISOString(),
-          })
-        );
-      }
-
-      router.push("/dashboard");
+      // Only internal paths are accepted as "next" (no open redirect).
+      const target = safeNextPath(new URLSearchParams(window.location.search).get("next"));
+      router.replace(data.profile?.mustChangePassword ? "/alterar-senha" : target);
     } catch {
       setErrorMessage("Não foi possível validar o login. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <div

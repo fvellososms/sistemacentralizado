@@ -1,0 +1,1 @@
+ALTER TABLE "nao_conformidades" ADD COLUMN "foto_url" text;

@@ -4,6 +4,7 @@ export const STATIC_PROJECTS: Project[] = [
   {
     id: 9901,
     name: "Hotel Marina",
+    clientCompanyName: "Hotel Marina",
     code: "HM-01",
     companyName: "Construtora",
     address: "Endereço Hotel Marina",
@@ -14,6 +15,7 @@ export const STATIC_PROJECTS: Project[] = [
   {
     id: 9902,
     name: "Smart Fit Leme",
+    clientCompanyName: null,
     code: "SFL-01",
     companyName: "Construtora",
     address: "Endereço Smart Fit Leme",
@@ -24,6 +26,7 @@ export const STATIC_PROJECTS: Project[] = [
   {
     id: 9903,
     name: "LMSG Galpão 29",
+    clientCompanyName: "LSMG",
     code: "LMSG-29",
     companyName: "Construtora",
     address: "Endereço Galpão",

@@ -9,5 +9,7 @@ export interface UserProfile {
   address?: string | null;
   department: string;
   avatarUrl?: string | null;
+  accessLevel?: "admin" | "usuario";
+  mustChangePassword?: boolean;
 }
 

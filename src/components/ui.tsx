@@ -1,4 +1,7 @@
-import React, { ReactNode } from 'react';
+"use client";
+
+import React, { ReactNode, useEffect, useState } from "react";
+import { AlertCircle, CheckCircle2, Info, AlertTriangle, X } from "lucide-react";
 
 export type Tone = "info" | "success" | "warning" | "danger" | "neutral";
 
@@ -75,16 +78,51 @@ export const Button = ({
   </button>
 );
 
-export const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message }: any) => {
-  if (!isOpen) return null;
+type ConfirmTone = "primary" | "success" | "danger";
+
+/**
+ * Confirmation dialog used by the APR screens (open/description/confirmLabel/tone/loading/onCancel,
+ * optional extra content as children). The older isOpen/message/onClose props are still accepted.
+ */
+export const ConfirmDialog = ({
+  open,
+  isOpen,
+  title,
+  description,
+  message,
+  confirmLabel = "Confirmar",
+  tone = "primary",
+  loading,
+  onConfirm,
+  onCancel,
+  onClose,
+  children,
+}: {
+  open?: boolean;
+  isOpen?: boolean;
+  title: string;
+  description?: ReactNode;
+  message?: ReactNode;
+  confirmLabel?: string;
+  tone?: ConfirmTone;
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel?: () => void;
+  onClose?: () => void;
+  children?: ReactNode;
+}) => {
+  if (!(open ?? isOpen)) return null;
+  const cancel = onCancel ?? onClose ?? (() => undefined);
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
-        <h3 className="font-bold mb-2 text-lg">{title}</h3>
-        <p className="mb-4 text-slate-600">{message}</p>
-        <div className="flex justify-end gap-2">
-          <Button onClick={onClose} variant="secondary">Cancelar</Button>
-          <Button onClick={onConfirm} variant="danger">Confirmar</Button>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !loading && cancel()} />
+      <div className="relative bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 p-6">
+        <h3 className="text-[16px] font-semibold text-slate-900 tracking-tight">{title}</h3>
+        {(description ?? message) && <p className="mt-2 text-[13px] text-slate-600 leading-relaxed">{description ?? message}</p>}
+        {children && <div className="mt-4">{children}</div>}
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={cancel} disabled={loading}>Cancelar</Button>
+          <Button variant={tone} loading={loading} onClick={onConfirm}>{confirmLabel}</Button>
         </div>
       </div>
     </div>
@@ -182,23 +220,167 @@ export const Textarea = ({
   </div>
 );
 
+export interface SiteToastEventDetail {
+  id?: number;
+  message: string;
+  tone: Tone;
+}
+
+const SITE_TOAST_EVENT = "fv-site-toast";
+
+export function extractErrorMessage(err: unknown, fallback = "Ocorreu um erro inesperado."): string {
+  if (!err) return fallback;
+  if (typeof err === "string") return err.trim() || fallback;
+  if (err instanceof Error && err.message?.trim()) return err.message.trim();
+  if (typeof err === "object" && "message" in err && typeof (err as any).message === "string") {
+    return ((err as any).message as string).trim() || fallback;
+  }
+  return fallback;
+}
+
+export function notifySite(message: string, tone: Tone = "danger"): void {
+  if (typeof window === "undefined") return;
+  const cleanMessage = (message || "").trim();
+  if (!cleanMessage) return;
+  window.dispatchEvent(
+    new CustomEvent<SiteToastEventDetail>(SITE_TOAST_EVENT, {
+      detail: { id: Date.now() + Math.random(), message: cleanMessage, tone },
+    })
+  );
+}
+
+function mapToastTypeToTone(type?: string): Tone {
+  if (type === "error" || type === "danger") return "danger";
+  if (type === "success") return "success";
+  if (type === "warning" || type === "warn") return "warning";
+  return "info";
+}
+
 export const useToast = () => {
   return {
-    push: (msg: string, type: string) => {
-      console.log(`[Toast ${type}]`, msg);
-      // if (typeof window !== "undefined") alert(msg);
+    push: (msg: string, type = "info") => {
+      notifySite(msg, mapToastTypeToTone(type));
     },
-    show: (msg: string, type: string) => {
-      console.log(`[Toast ${type}]`, msg);
-      if (typeof window !== "undefined") alert(msg);
+    show: (msg: string, type = "info") => {
+      notifySite(msg, mapToastTypeToTone(type));
     },
     error: (msg: string) => {
-      console.error(`[Toast error]`, msg);
-      if (typeof window !== "undefined") alert(msg);
+      notifySite(msg, "danger");
     },
     success: (msg: string) => {
-      console.log(`[Toast success]`, msg);
-      if (typeof window !== "undefined") alert(msg);
-    }
+      notifySite(msg, "success");
+    },
   };
 };
+
+interface ActiveToast {
+  id: number;
+  message: string;
+  tone: Tone;
+}
+
+export function GlobalToastViewport() {
+  const [toasts, setToasts] = useState<ActiveToast[]>([]);
+
+  useEffect(() => {
+    const addToast = (message: string, tone: Tone = "danger") => {
+      const id = Date.now() + Math.random();
+      setToasts((prev) => {
+        // Avoid duplicate identical messages already on screen
+        if (prev.some((t) => t.message === message && t.tone === tone)) return prev;
+        return [...prev.slice(-4), { id, message, tone }];
+      });
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 6500);
+    };
+
+    const handleCustomToast = (event: Event) => {
+      const custom = event as CustomEvent<SiteToastEventDetail>;
+      if (custom.detail?.message) {
+        addToast(custom.detail.message, custom.detail.tone || "info");
+      }
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const msg = extractErrorMessage(event.reason, "Falha inesperada na operação.");
+      addToast(msg, "danger");
+    };
+
+    const handleWindowError = (event: ErrorEvent) => {
+      if (event.message?.includes("ResizeObserver loop")) return;
+      const msg = extractErrorMessage(event.error ?? event.message, "Erro inesperado na aplicação.");
+      addToast(msg, "danger");
+    };
+
+    window.addEventListener(SITE_TOAST_EVENT, handleCustomToast);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    window.addEventListener("error", handleWindowError);
+
+    return () => {
+      window.removeEventListener(SITE_TOAST_EVENT, handleCustomToast);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+      window.removeEventListener("error", handleWindowError);
+    };
+  }, []);
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div
+      aria-live="assertive"
+      className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 max-w-md w-[calc(100vw-2rem)] pointer-events-none"
+    >
+      {toasts.map((t) => {
+        const isDanger = t.tone === "danger";
+        const isSuccess = t.tone === "success";
+        const isWarning = t.tone === "warning";
+
+        const Icon = isDanger
+          ? AlertCircle
+          : isSuccess
+            ? CheckCircle2
+            : isWarning
+              ? AlertTriangle
+              : Info;
+
+        const containerClass = isDanger
+          ? "bg-red-50/95 border-red-200 text-red-900 shadow-red-900/10"
+          : isSuccess
+            ? "bg-emerald-50/95 border-emerald-200 text-emerald-900 shadow-emerald-900/10"
+            : isWarning
+              ? "bg-amber-50/95 border-amber-200 text-amber-900 shadow-amber-900/10"
+              : "bg-slate-900/95 border-slate-700 text-white shadow-slate-900/20";
+
+        const iconClass = isDanger
+          ? "text-red-600"
+          : isSuccess
+            ? "text-emerald-600"
+            : isWarning
+              ? "text-amber-600"
+              : "text-blue-400";
+
+        return (
+          <div
+            key={t.id}
+            role="alert"
+            className={`pointer-events-auto flex items-start gap-3 px-4 py-3.5 rounded-2xl border shadow-xl backdrop-blur-md transition-all ${containerClass}`}
+          >
+            <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${iconClass}`} strokeWidth={2} />
+            <div className="flex-1 min-w-0 text-[13px] font-medium leading-snug break-words">
+              {t.message}
+            </div>
+            <button
+              type="button"
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              aria-label="Fechar aviso"
+              className="p-1 -mr-1 -mt-1 rounded-lg opacity-70 hover:opacity-100 hover:bg-black/5 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

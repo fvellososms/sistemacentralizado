@@ -117,7 +117,7 @@ export function PhotoCard({ photo, onDelete, canDelete = true }: PhotoCardProps)
 
           {photo.caption && (
             <p className="text-[12px] text-slate-500 italic line-clamp-2 leading-snug">
-              "{photo.caption}"
+              “{photo.caption}”
             </p>
           )}
 
@@ -171,7 +171,7 @@ export function PhotoCard({ photo, onDelete, canDelete = true }: PhotoCardProps)
             <div className="mt-3 text-center text-white bg-slate-900/70 px-4 py-2.5 rounded-xl border border-white/10 max-w-lg">
               <div className="text-[13px] font-semibold">{photo.activityName}</div>
               {photo.caption && (
-                <div className="text-[12px] text-slate-300 mt-0.5">"{photo.caption}"</div>
+                <div className="text-[12px] text-slate-300 mt-0.5">“{photo.caption}”</div>
               )}
               <div className="text-[11px] text-amber-300 font-mono mt-1.5">
                 {photo.timestamp} · {photo.locationText}

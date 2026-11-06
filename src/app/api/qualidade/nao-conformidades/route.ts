@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createNaoConformidade, listNaoConformidades } from "@/modules/quality/server";
-import { AppError } from "@/shared/errors/AppError";
+import { getSessionUser } from "@/modules/users/server";
+import { defaultNaoConformidadeRepository } from "@/modules/quality/server";
+import { defaultMailer } from "@/shared/email/mailer";
+import { errorResponse } from "@/shared/http/route-error";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +15,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const naoConformidade = await createNaoConformidade(await request.json());
-    return NextResponse.json({ naoConformidade, message: "Não conformidade registrada." }, { status: 201 });
+    const { naoConformidade, email } = await createNaoConformidade(
+      await request.json(),
+      defaultNaoConformidadeRepository,
+      defaultMailer,
+      await getSessionUser()
+    );
+    return NextResponse.json({ naoConformidade, email, message: "Não conformidade registrada." }, { status: 201 });
   } catch (error) {
-    if (error instanceof AppError) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-    console.error("Erro ao registrar não conformidade:", error);
-    return NextResponse.json({ error: "Falha ao registrar a não conformidade." }, { status: 500 });
+    return errorResponse(error, "Falha ao registrar a não conformidade.", "Erro ao registrar não conformidade");
   }
 }

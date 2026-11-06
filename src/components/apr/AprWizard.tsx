@@ -14,20 +14,25 @@ import { novaKey, type AprDraft, type BuscaResposta, type RiscoBase, type Sugest
 
 type EstadoAssistente = "aguardando" | "pesquisando" | "sugestoes" | "vazio" | "erro" | "revisado";
 
-export function AprWizard({
-  inicial,
-  obraNome,
-  usuarioNome,
-  isOpen,
-  onClose,
-}: {
+interface AprWizardProps {
   inicial: AprDraft;
   obraNome: string | null;
   usuarioNome: string;
   isOpen?: boolean;
   onClose?: () => void;
-}) {
-  if (isOpen !== undefined && !isOpen) return null;
+}
+
+/**
+ * The open/closed check lives outside the component that holds the hooks: returning early
+ * before hooks would change their count between renders and crash React when the modal toggles.
+ * Closing also unmounts the content, so reopening starts a fresh wizard.
+ */
+export function AprWizard(props: AprWizardProps) {
+  if (props.isOpen !== undefined && !props.isOpen) return null;
+  return <AprWizardContent {...props} />;
+}
+
+function AprWizardContent({ inicial, obraNome, usuarioNome, onClose }: AprWizardProps) {
   const router = useRouter();
   const toast = useToast();
   const [draft, setDraft] = useState<AprDraft>(inicial);
@@ -48,8 +53,11 @@ export function AprWizard({
   const [erroBusca, setErroBusca] = useState<string | null>(null);
   const ultimaDescricao = useRef<string>(inicial.atividades.length ? inicial.descricaoServico : "");
   const topoRef = useRef<HTMLDivElement>(null);
+  // Read only by async handlers, after the render that changed the draft has been committed.
   const draftRef = useRef(draft);
-  draftRef.current = draft;
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   const atualizar = useCallback((fn: (d: AprDraft) => AprDraft) => setDraft((d) => fn(d)), []);
 

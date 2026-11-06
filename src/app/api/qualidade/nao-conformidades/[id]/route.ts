@@ -1,18 +1,30 @@
 import { NextResponse } from "next/server";
-import { resolveNaoConformidade } from "@/modules/quality/server";
+import { defaultNaoConformidadeRepository, getNaoConformidadeDetail, resolveNaoConformidade } from "@/modules/quality/server";
+import { requireAdmin } from "@/modules/users/server";
 import { AppError } from "@/shared/errors/AppError";
+import { errorResponse } from "@/shared/http/route-error";
+import { parseIdParam } from "@/shared/http/route-params";
 
-/** PATCH { status: "resolvida" } marks the NC as resolved. */
+export const dynamic = "force-dynamic";
+
+/** NC with its action plan and history. */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    return NextResponse.json({ naoConformidade: await getNaoConformidadeDetail(await parseIdParam(params)) });
+  } catch (error) {
+    return errorResponse(error, "Falha ao carregar a não conformidade.", "GET /api/qualidade/nao-conformidades/[id]");
+  }
+}
+
+/** Legacy: PATCH { status: "resolvida" } closes the NC directly (admin only). */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = parseInt((await params).id, 10);
+    const id = await parseIdParam(params);
     const body = (await request.json().catch(() => ({}))) as { status?: string };
-    if (isNaN(id) || body.status !== "resolvida") throw AppError.badRequest("Requisição inválida.");
-    const naoConformidade = await resolveNaoConformidade(id);
+    if (body.status !== "resolvida") throw AppError.badRequest("Requisição inválida.");
+    const naoConformidade = await resolveNaoConformidade(id, defaultNaoConformidadeRepository, await requireAdmin());
     return NextResponse.json({ naoConformidade });
   } catch (error) {
-    if (error instanceof AppError) return NextResponse.json({ error: error.message }, { status: error.statusCode });
-    console.error("Erro ao atualizar não conformidade:", error);
-    return NextResponse.json({ error: "Falha ao atualizar a não conformidade." }, { status: 500 });
+    return errorResponse(error, "Falha ao atualizar a não conformidade.", "PATCH /api/qualidade/nao-conformidades/[id]");
   }
 }

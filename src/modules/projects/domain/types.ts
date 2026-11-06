@@ -7,5 +7,7 @@ export interface Project {
   managerName: string;
   status: string;
   startDate: string;
+  clientCompanyId?: number | null;
+  clientCompanyName?: string | null; // empresa cliente dona da obra
 }
 

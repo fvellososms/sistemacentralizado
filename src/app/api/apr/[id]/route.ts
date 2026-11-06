@@ -2,6 +2,7 @@ import { carregarApr, salvarApr } from "@/lib/apr/repo";
 import type { AprDraft } from "@/lib/apr/types";
 import { validarDraft } from "@/lib/apr/validacao";
 import { getUsuarioAtual } from "@/db/session";
+import { publicErrorMessage } from "@/shared/http/route-error";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
     return Response.json({ id: Number(id) });
   } catch (e) {
     console.error(e);
-    return Response.json({ error: e instanceof Error ? e.message : "Falha ao salvar APR." }, { status: 500 });
+    return Response.json({ error: publicErrorMessage(e, "Falha ao salvar APR.") }, { status: 500 });
   }
 }

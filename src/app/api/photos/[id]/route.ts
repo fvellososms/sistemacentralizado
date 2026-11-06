@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deletePhoto } from "@/modules/rdo/server";
 import { AppError } from "@/shared/errors/AppError";
+import { parseIdParam } from "@/shared/http/route-params";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -8,8 +9,7 @@ interface RouteParams {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const photoId = parseInt(id, 10);
+    const photoId = await parseIdParam(params);
     if (isNaN(photoId)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }

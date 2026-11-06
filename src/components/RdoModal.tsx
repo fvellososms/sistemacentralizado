@@ -746,7 +746,7 @@ export function RdoModal({
                 {contractors.length === 0 ? (
                   <div className="p-4 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                     <p className="text-[12px] font-medium text-slate-500">Nenhum empreiteiro adicionado.</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Adicionar" para incluir frentes terceirizadas.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em “Adicionar” para incluir frentes terceirizadas.</p>
                   </div>
                 ) : (
                   <div className="space-y-2">

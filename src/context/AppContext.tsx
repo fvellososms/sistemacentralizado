@@ -6,8 +6,10 @@ import type { Project } from "@/modules/projects/domain/types";
 import { STATIC_PROJECTS } from "@/modules/projects/domain/constants";
 import type { UserProfile } from "@/modules/users/domain/types";
 import { DEFAULT_PROFILE } from "@/modules/users/domain/constants";
+import { mergeUserProfile, parseStoredUserSession } from "@/modules/users/domain/rules";
 
 export type { Project, UserProfile };
+
 
 interface AppContextType {
   projects: Project[];
@@ -30,10 +32,32 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(STATIC_PROJECTS);
   const [activeProject, setActiveProjectState] = useState<Project | null>(STATIC_PROJECTS[0]);
-  const [profile, setProfile] = useState<UserProfile | null>(DEFAULT_PROFILE);
+  const [profile, setProfileState] = useState<UserProfile | null>(DEFAULT_PROFILE);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialDate, setCreateModalInitialDate] = useState<string | undefined>(undefined);
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
+
+  const setProfile = (nextProfile: UserProfile) => {
+    setProfileState(nextProfile);
+    if (typeof window !== "undefined") {
+      try {
+        const existingSession = parseStoredUserSession(localStorage.getItem("rdo_user_session"));
+        if (existingSession) {
+          localStorage.setItem(
+            "rdo_user_session",
+            JSON.stringify({
+              ...existingSession,
+              ...nextProfile,
+              loggedAt: existingSession.loggedAt || new Date().toISOString(),
+            })
+          );
+        }
+      } catch {
+        // ignore storage errors
+      }
+    }
+  };
+
 
   const setActiveProject = (proj: Project) => {
     setActiveProjectState(proj);
@@ -89,7 +113,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!res.ok) return;
       const data = await res.json();
       if (data.profile) {
-        setProfile(data.profile);
+        const storedSession =
+          typeof window !== "undefined"
+            ? parseStoredUserSession(localStorage.getItem("rdo_user_session"))
+            : null;
+
+        let resolvedProfile: UserProfile = data.profile;
+        if (
+          storedSession?.avatarUrl &&
+          storedSession.avatarUrl !== DEFAULT_PROFILE.avatarUrl &&
+          resolvedProfile.avatarUrl === DEFAULT_PROFILE.avatarUrl
+        ) {
+          resolvedProfile = mergeUserProfile(resolvedProfile, {
+            avatarUrl: storedSession.avatarUrl,
+          });
+        }
+        setProfile(resolvedProfile);
       }
     } catch (e) {
       console.error("Failed to load profile:", e);
@@ -97,8 +136,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedSession = parseStoredUserSession(localStorage.getItem("rdo_user_session"));
+      if (storedSession) {
+        setProfileState(mergeUserProfile(DEFAULT_PROFILE, storedSession));
+      }
+    }
+
     refreshProjects();
     refreshProfile();
+
 
     // Check draft existence in localStorage
     if (typeof window !== "undefined") {

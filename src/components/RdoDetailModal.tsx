@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   X,
-  Printer,
   Edit3,
   CloudSun,
   Users,
@@ -15,6 +14,13 @@ import {
 } from "lucide-react";
 import { PhotoCard, PhotoData } from "./PhotoCard";
 import { ConfirmModal } from "./ConfirmModal";
+import { PdfDownloadButton } from "./documents/PdfDownloadButton";
+import {
+  cacheRdoDetailClient,
+  getCachedRdoDetailClient,
+  invalidateRdoDetailClient,
+} from "./documents/rdo-document";
+import { extractErrorMessage, notifySite } from "./ui";
 import { isDayStopped } from "@/modules/rdo";
 
 interface RdoDetailModalProps {
@@ -39,13 +45,25 @@ export function RdoDetailModal({
 
   React.useEffect(() => {
     if (isOpen && rdoId) {
+      const cached = getCachedRdoDetailClient(rdoId);
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       fetch(`/api/rdos/${rdoId}`)
-        .then((res) => res.json())
-        .then((json) => {
-          if (json.rdo) setData(json.rdo);
+        .then(async (res) => {
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || !json.rdo) {
+            throw new Error(json.error || "Não foi possível carregar os detalhes do RDO.");
+          }
+          cacheRdoDetailClient(rdoId, json.rdo);
+          setData(json.rdo);
         })
-        .catch((err) => console.error("Error loading RDO:", err))
+        .catch((err) => {
+          notifySite(extractErrorMessage(err, "Erro ao carregar RDO."), "danger");
+        })
         .finally(() => setLoading(false));
     } else {
       setData(null);
@@ -60,21 +78,24 @@ export function RdoDetailModal({
     try {
       const res = await fetch(`/api/photos/${photoToDelete.id}`, { method: "DELETE" });
       if (res.ok) {
+        if (rdoId) invalidateRdoDetailClient(rdoId);
         setData((prev: any) => ({
           ...prev,
           photos: prev.photos.filter((p: any) => p.id !== photoToDelete.id),
         }));
         setPhotoToDelete(null);
+        notifySite("Foto removida com sucesso.", "success");
         if (onRefresh) onRefresh();
+      } else {
+        const json = await res.json().catch(() => ({}));
+        notifySite(json.error || "Não foi possível excluir a foto.", "danger");
       }
     } catch (err) {
-      console.error(err);
+      notifySite(extractErrorMessage(err, "Erro ao excluir foto."), "danger");
     } finally {
       setIsDeletingPhoto(false);
     }
   };
-
-  const handlePrint = () => window.print();
 
   const getWeatherLabel = (val?: string) => {
     switch (val) {
@@ -138,13 +159,13 @@ export function RdoDetailModal({
           </div>
 
           <div className="flex items-center gap-1 ml-3">
-            <button
-              onClick={handlePrint}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
-              title="Imprimir"
-            >
-              <Printer className="w-4 h-4" strokeWidth={1.8} />
-            </button>
+            {data && (
+              <PdfDownloadButton
+                appearance="icon"
+                label="Baixar PDF do RDO"
+                build={async () => (await import("@/components/documents/rdo-document")).buildRdoPdf(data)}
+              />
+            )}
             {onEdit && (
               <button
                 onClick={() => {

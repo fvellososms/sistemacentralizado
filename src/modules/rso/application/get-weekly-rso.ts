@@ -1,8 +1,14 @@
 import { db } from "@/db";
 import { rdos, rdoContractors, rdoActivities, rdoOccurrences, rdoPhotos, projects } from "@/db/schema";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, and, gte, lte, asc, inArray } from "drizzle-orm";
 import { calculateRsoSummary } from "../domain/calculations";
 import type { RsoReport } from "../domain/types";
+import { STATIC_PROJECTS } from "@/modules/projects";
+import {
+  listRawFallbackRdos,
+  isRdoDbRecentlyDown,
+  markRdoDbDown,
+} from "@/modules/rdo/infrastructure/rdo-fallback-store";
 
 export interface GetWeeklyRsoParams {
   projectId: number;
@@ -10,12 +16,58 @@ export interface GetWeeklyRsoParams {
   endDate?: string | null;
 }
 
+function buildFallbackWeeklyRso(params: GetWeeklyRsoParams): RsoReport {
+  const { projectId, startDate, endDate } = params;
+  const staticProject = STATIC_PROJECTS.find((p) => p.id === projectId) ?? null;
+  const fallbackList = listRawFallbackRdos({
+    projectId,
+    startDate,
+    endDate,
+  });
+
+  const allContractors = fallbackList.flatMap((r) => r.contractors ?? []);
+  const allActivities = fallbackList.flatMap((r) => r.activities ?? []);
+  const allOccurrences = fallbackList.flatMap((r) => r.occurrences ?? []);
+  const allPhotos = fallbackList.flatMap((r) => r.photos ?? []);
+  const summary = calculateRsoSummary(fallbackList, allOccurrences.length);
+
+  return {
+    project: staticProject,
+    period: { startDate, endDate },
+    summary,
+    rdos: fallbackList,
+    contractors: allContractors,
+    activities: allActivities,
+    occurrences: allOccurrences,
+    photos: allPhotos,
+  };
+}
+
 export async function getWeeklyRso(params: GetWeeklyRsoParams): Promise<RsoReport> {
   const { projectId, startDate, endDate } = params;
 
+  if (isRdoDbRecentlyDown()) {
+    return buildFallbackWeeklyRso(params);
+  }
+
   try {
-    const projectResult = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
-    const project = projectResult[0] || null;
+    const projectResult = await db
+      .select({
+        id: projects.id,
+        name: projects.name,
+        code: projects.code,
+        companyName: projects.companyName,
+        address: projects.address,
+        managerName: projects.managerName,
+        status: projects.status,
+        startDate: projects.startDate,
+        createdAt: projects.createdAt,
+      })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1)
+      .catch(() => []);
+    const project = projectResult[0] || STATIC_PROJECTS.find((p) => p.id === projectId) || null;
 
     const conditions = [eq(rdos.projectId, projectId)];
     if (startDate && endDate) {
@@ -38,16 +90,16 @@ export async function getWeeklyRso(params: GetWeeklyRsoParams): Promise<RsoRepor
 
     if (rdoIds.length > 0) {
       const [cList, aList, oList, pList] = await Promise.all([
-        db.select().from(rdoContractors),
-        db.select().from(rdoActivities),
-        db.select().from(rdoOccurrences),
-        db.select().from(rdoPhotos),
+        db.select().from(rdoContractors).where(inArray(rdoContractors.rdoId, rdoIds)),
+        db.select().from(rdoActivities).where(inArray(rdoActivities.rdoId, rdoIds)),
+        db.select().from(rdoOccurrences).where(inArray(rdoOccurrences.rdoId, rdoIds)),
+        db.select().from(rdoPhotos).where(inArray(rdoPhotos.rdoId, rdoIds)),
       ]);
 
-      allContractors = cList.filter((c) => rdoIds.includes(c.rdoId));
-      allActivities = aList.filter((a) => rdoIds.includes(a.rdoId));
-      allOccurrences = oList.filter((o) => rdoIds.includes(o.rdoId));
-      allPhotos = pList.filter((p) => rdoIds.includes(p.rdoId));
+      allContractors = cList;
+      allActivities = aList;
+      allOccurrences = oList;
+      allPhotos = pList;
     }
 
     const summary = calculateRsoSummary(rdoList, allOccurrences.length);
@@ -63,18 +115,9 @@ export async function getWeeklyRso(params: GetWeeklyRsoParams): Promise<RsoRepor
       photos: allPhotos,
     };
   } catch (error) {
+    markRdoDbDown();
     console.warn("getWeeklyRso: database unavailable, returning fallback report:", error);
-    const summary = calculateRsoSummary([], 0);
-    return {
-      project: null,
-      period: { startDate, endDate },
-      summary,
-      rdos: [],
-      contractors: [],
-      activities: [],
-      occurrences: [],
-      photos: [],
-    };
+    return buildFallbackWeeklyRso(params);
   }
 }
 

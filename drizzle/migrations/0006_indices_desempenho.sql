@@ -1,0 +1,19 @@
+CREATE INDEX "apr_obra_atualizado_idx" ON "apr" USING btree ("obra_id","atualizado_em");--> statement-breakpoint
+CREATE INDEX "apr_atividade_apr_idx" ON "apr_atividade" USING btree ("apr_id");--> statement-breakpoint
+CREATE INDEX "apr_controle_risco_idx" ON "apr_controle" USING btree ("apr_risco_id");--> statement-breakpoint
+CREATE INDEX "apr_risco_atividade_idx" ON "apr_risco" USING btree ("apr_atividade_id");--> statement-breakpoint
+CREATE INDEX "atividade_risco_atividade_idx" ON "atividade_risco" USING btree ("atividade_id");--> statement-breakpoint
+CREATE INDEX "atividade_termos_atividade_idx" ON "atividade_termos" USING btree ("atividade_id");--> statement-breakpoint
+CREATE INDEX "audit_logs_created_idx" ON "audit_logs" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "nao_conformidades_project_data_idx" ON "nao_conformidades" USING btree ("project_id","data_ocorrencia");--> statement-breakpoint
+CREATE INDEX "nc_acoes_nc_idx" ON "nc_acoes" USING btree ("nc_id");--> statement-breakpoint
+CREATE INDEX "nc_eventos_nc_idx" ON "nc_eventos" USING btree ("nc_id");--> statement-breakpoint
+CREATE INDEX "rdo_activities_rdo_idx" ON "rdo_activities" USING btree ("rdo_id");--> statement-breakpoint
+CREATE INDEX "rdo_contractors_rdo_idx" ON "rdo_contractors" USING btree ("rdo_id");--> statement-breakpoint
+CREATE INDEX "rdo_non_conformities_rdo_idx" ON "rdo_non_conformities" USING btree ("rdo_id");--> statement-breakpoint
+CREATE INDEX "rdo_occurrences_rdo_idx" ON "rdo_occurrences" USING btree ("rdo_id");--> statement-breakpoint
+CREATE INDEX "rdo_photos_rdo_idx" ON "rdo_photos" USING btree ("rdo_id");--> statement-breakpoint
+CREATE INDEX "rdos_project_date_idx" ON "rdos" USING btree ("project_id","date");--> statement-breakpoint
+CREATE INDEX "risco_controle_risco_idx" ON "risco_controle" USING btree ("risco_id");--> statement-breakpoint
+CREATE INDEX "risco_nr_risco_idx" ON "risco_nr" USING btree ("risco_id");--> statement-breakpoint
+CREATE INDEX "workspace_activities_occurred_on_idx" ON "workspace_activities" USING btree ("occurred_on");

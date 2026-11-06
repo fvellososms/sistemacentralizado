@@ -54,14 +54,29 @@ src/
 │   │   ├── domain/                   # Entidade Project, constantes estáticas
 │   │   ├── application/              # Caso de uso getProjects
 │   │   └── index.ts
-│   └── users/                        # Usuários e Perfis
+│   ├── workspace/                    # Espaço de trabalho do setor técnico
+│   │   ├── domain/                   # Visitas e atividades manuais do sistema, eventos importados do ESO, tarefas (kanban)
+│   │   ├── application/              # CRUD de atividades manuais e tarefas, importação ESO, status das integrações
+│   │   ├── infrastructure/           # Repositórios Drizzle (workspace_activities, workspace_tasks)
+│   │   ├── index.ts                  # Contrato client-safe (domínio)
+│   │   └── server.ts                 # Contrato de servidor (domínio + casos de uso)
+│   ├── clients/                      # Empresas clientes (CNPJ, contato) — cada obra pertence a uma
+│   ├── audit/                        # Registro de ações administrativas (auditoria)
+│   └── users/                        # Usuários, login seguro, sessão, níveis de acesso e admin de contas
 │       ├── domain/                   # Entidade UserProfile, perfil padrão
 │       ├── application/              # getProfile, updateProfile
 │       └── index.ts
 │
+├── components/documents/             # Template e geração de PDF (RDO, RSO, APR, NC) com @react-pdf/renderer
+│   ├── template.tsx                  # Cabeçalho com logo, quadro de controle, seções, tabelas, fotos, assinaturas
+│   ├── *-document.tsx                # Um documento por tipo, carregado sob demanda (import dinâmico)
+│   └── PdfDownloadButton.tsx         # Botão "Baixar PDF" e downloadPdf()
+│
 ├── shared/                           # Recursos Compartilhados Transversais
+│   ├── documents/                    # Regras puras dos documentos (código, nome do arquivo, datas)
 │   ├── components/                   # AppLayout, TopHeader, Sidebar, BottomNav, ui.tsx
-│   ├── errors/                       # AppError padronizado
+│   ├── errors/                       # AppError padronizado, withDatabase (503 quando o banco cai)
+│   ├── security/                     # Hash de senha (scrypt), sessão assinada (HMAC) e regras de acesso às rotas
 │   └── types/                        # Tipos utilitários globais
 │
 ├── context/                          # Estado Reativo Global de Interface

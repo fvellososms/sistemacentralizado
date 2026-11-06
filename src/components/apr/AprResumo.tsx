@@ -5,6 +5,33 @@ import { formatarData } from "@/lib/apr/format";
 import { NivelBadge, TipoControleBadge } from "./shared";
 import { PROBABILIDADE_LABEL, SEVERIDADE_LABEL, TIPO_CONTROLE_ORDEM, type AprDraft } from "@/lib/apr/types";
 
+/** Declared outside AprResumo so React keeps the same component between renders. */
+function Secao({
+  titulo,
+  etapa,
+  onEditar,
+  children,
+}: {
+  titulo: string;
+  etapa: number;
+  onEditar?: (etapa: number) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden p-4 sm:p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-[16px] font-semibold text-slate-900 tracking-tight">{titulo}</h3>
+        {onEditar && (
+          <button type="button" onClick={() => onEditar(etapa)} className="text-sm font-medium text-border-slate-400 ring-slate-400 hover:underline">
+            Editar
+          </button>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function AprResumo({
   draft,
   obraNome,
@@ -20,23 +47,9 @@ export function AprResumo({
     0,
   );
 
-  const Secao = ({ titulo, etapa, children }: { titulo: string; etapa: number; children: React.ReactNode }) => (
-    <section className="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden p-4 sm:p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-[16px] font-semibold text-slate-900 tracking-tight">{titulo}</h3>
-        {onEditar && (
-          <button type="button" onClick={() => onEditar(etapa)} className="text-sm font-medium text-border-slate-400 ring-slate-400 hover:underline">
-            Editar
-          </button>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-
   return (
     <div className="flex flex-col gap-4">
-      <Secao titulo="Identificação" etapa={1}>
+      <Secao titulo="Identificação" etapa={1} onEditar={onEditar}>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-slate-500">Obra</dt>
@@ -61,7 +74,7 @@ export function AprResumo({
         </dl>
       </Secao>
 
-      <Secao titulo={`Atividades, riscos e controles (${draft.atividades.length} · ${totalRiscos} · ${totalControles})`} etapa={2}>
+      <Secao titulo={`Atividades, riscos e controles (${draft.atividades.length} · ${totalRiscos} · ${totalControles})`} etapa={2} onEditar={onEditar}>
         {draft.atividades.length === 0 && <p className="text-sm text-slate-500">Nenhuma atividade selecionada.</p>}
         <div className="flex flex-col gap-4">
           {draft.atividades.map((a, i) => (

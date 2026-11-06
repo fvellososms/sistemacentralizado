@@ -1,5 +1,6 @@
 import { aprovarApr, carregarApr, reprovarApr, submeterApr } from "@/lib/apr/repo";
 import { getUsuarioAtual } from "@/db/session";
+import { publicErrorMessage } from "@/shared/http/route-error";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ ok: true });
   } catch (e) {
     console.error(e);
-    return Response.json({ error: e instanceof Error ? e.message : "Falha ao executar ação." }, { status: 400 });
+    return Response.json({ error: publicErrorMessage(e, "Falha ao executar ação.") }, { status: 400 });
   }
 }

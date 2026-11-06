@@ -1,5 +1,6 @@
 export * from "./domain/state-machine";
 export * from "./domain/risk-distribution";
+export * from "./domain/perfil";
 export * from "./application/get-risk-distribution";
 export * from "@/lib/apr/types";
 export * from "@/lib/apr/risco";

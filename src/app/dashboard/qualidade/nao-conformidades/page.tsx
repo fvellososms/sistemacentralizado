@@ -2,31 +2,50 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, FileWarning, Mail, Plus, X } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, FileWarning, Mail, Plus, Trash2, X } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui";
+import { PdfDownloadButton } from "@/components/documents/PdfDownloadButton";
+import { comprimirFoto } from "@/components/quality/compress-photo";
 import { useApp } from "@/context/AppContext";
 import {
   NC_GRAUS,
-  NC_SITUACOES,
+  NC_SITUACOES_FLUXO,
   NC_TIPOS,
+  calcularIndicadoresNc,
   diasAtePrazo,
-  getNcSituacao,
+  getNcSituacaoFluxo,
   validateNaoConformidade,
   type NaoConformidadeErrors,
   type NaoConformidadeInput,
   type NcGrau,
-  type NcSituacao,
+  type NcSituacaoFluxo,
   type NcTipo,
 } from "@/modules/quality";
+import { NcDetailModal, SITUACAO_FLUXO_STYLE } from "@/components/quality/NcDetailModal";
 
 interface NaoConformidade extends NaoConformidadeInput {
   id: number;
   status: string;
   resolvidaEm: string | null;
+  encerradaEm: string | null;
+  acoesConcluidas: number;
+  acoesTotal: number;
+  temFoto: boolean; // the list does not carry the photo itself (see abrirFoto)
 }
 
-const hojeIso = () => new Date().toISOString().slice(0, 10);
+const hojeIso = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+const FILTROS: { id: "todas" | NcSituacaoFluxo; label: string }[] = [
+  { id: "todas", label: "Todas" },
+  { id: "aberta", label: "Abertas" },
+  { id: "em_tratamento", label: "Em tratamento" },
+  { id: "vencida", label: "Vencidas" },
+  { id: "aguardando_verificacao", label: "Aguardando verificação" },
+  { id: "encerrada", label: "Encerradas" },
+  { id: "cancelada", label: "Canceladas" },
+];
 
 const formatarData = (iso: string) => {
   const [y, m, d] = iso.split("-");
@@ -39,22 +58,38 @@ const GRAU_STYLE: Record<NcGrau, string> = {
   grave: "bg-red-50 text-red-700 border-red-200",
 };
 
-const SITUACAO_STYLE: Record<NcSituacao, string> = {
-  aberta: "bg-blue-50 text-blue-700 border-blue-100",
-  vencida: "bg-red-50 text-red-700 border-red-100",
-  resolvida: "bg-emerald-50 text-emerald-700 border-emerald-100",
-};
 
 const inputClass =
   "w-full px-3.5 py-2.5 text-[13px] rounded-xl border bg-white focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300 font-medium transition placeholder:text-slate-400";
 const labelClass = "block text-[11.5px] font-semibold text-slate-700 mb-1.5";
+
+type EmailResultado = { sent: true } | { sent: false; reason: string };
 
 export default function NaoConformidadesPage() {
   const { activeProject } = useApp();
   const [itens, setItens] = useState<NaoConformidade[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
-  const [resolvendoId, setResolvendoId] = useState<number | null>(null);
+  const [detalheId, setDetalheId] = useState<number | null>(null);
+  const [filtro, setFiltro] = useState<(typeof FILTROS)[number]["id"]>("todas");
+  const [fotoAberta, setFotoAberta] = useState<string | null>(null);
+  const [carregandoFotoId, setCarregandoFotoId] = useState<number | null>(null);
+
+  /** Loads the photo only when requested, keeping the list light. */
+  const abrirFoto = async (id: number) => {
+    setCarregandoFotoId(id);
+    try {
+      const res = await fetch(`/api/qualidade/nao-conformidades/${id}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.naoConformidade?.fotoUrl) setFotoAberta(data.naoConformidade.fotoUrl);
+      else setAviso({ ok: false, texto: data.error || "Não foi possível carregar a foto." });
+    } catch {
+      setAviso({ ok: false, texto: "Não foi possível carregar a foto." });
+    } finally {
+      setCarregandoFotoId(null);
+    }
+  };
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
   const hoje = hojeIso();
 
   const carregar = useCallback(async () => {
@@ -75,25 +110,12 @@ export default function NaoConformidadesPage() {
     void carregar();
   }, [carregar]);
 
-  const resumo = useMemo(() => {
-    const contagem: Record<NcSituacao, number> = { aberta: 0, vencida: 0, resolvida: 0 };
-    for (const nc of itens) contagem[getNcSituacao(nc, hoje)]++;
-    return contagem;
-  }, [itens, hoje]);
-
-  const marcarResolvida = async (id: number) => {
-    setResolvendoId(id);
-    try {
-      const res = await fetch(`/api/qualidade/nao-conformidades/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "resolvida" }),
-      });
-      if (res.ok) await carregar();
-    } finally {
-      setResolvendoId(null);
-    }
-  };
+  const indicadores = useMemo(() => calcularIndicadoresNc(itens, hoje), [itens, hoje]);
+  const visiveis = useMemo(
+    () => (filtro === "todas" ? itens : itens.filter((nc) => getNcSituacaoFluxo(nc, hoje) === filtro)),
+    [itens, filtro, hoje]
+  );
+  const s0 = indicadores.porSituacao;
 
   return (
     <AppLayout>
@@ -123,14 +145,55 @@ export default function NaoConformidadesPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          {(Object.keys(NC_SITUACOES) as NcSituacao[]).map((s) => (
-            <div key={s} className="bg-white rounded-2xl border border-slate-200/80 p-4">
-              <p className="text-[11.5px] font-medium text-slate-500">{NC_SITUACOES[s]}s</p>
-              <p className={`mt-1 text-2xl font-semibold ${s === "vencida" && resumo[s] > 0 ? "text-red-600" : "text-slate-900"}`}>
-                {resumo[s]}
-              </p>
+        {aviso && (
+          <div
+            role="status"
+            className={`p-3.5 rounded-xl border text-[13px] flex items-start justify-between gap-3 ${
+              aviso.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}
+          >
+            <span>{aviso.texto}</span>
+            <button type="button" onClick={() => setAviso(null)} aria-label="Fechar aviso" className="shrink-0 opacity-70 hover:opacity-100">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[
+            { label: "Em aberto", value: s0.aberta + s0.em_tratamento, hint: `${s0.em_tratamento} em tratamento`, alert: false },
+            { label: "Vencidas", value: s0.vencida, hint: "Prazo expirado sem conclusão", alert: s0.vencida > 0 },
+            { label: "Aguardando verificação", value: s0.aguardando_verificacao, hint: "Eficácia a verificar pelo SMS", alert: false },
+            { label: "Encerradas", value: s0.encerrada, hint: indicadores.encerradasNoPrazo === null ? "—" : `${indicadores.encerradasNoPrazo}% dentro do prazo`, alert: false },
+            {
+              label: "Tempo médio",
+              value: indicadores.tempoMedioEncerramentoDias === null ? "—" : `${indicadores.tempoMedioEncerramentoDias} d`,
+              hint: "Da ocorrência ao encerramento",
+              alert: false,
+            },
+          ].map((c) => (
+            <div key={c.label} className="bg-white rounded-2xl border border-slate-200/80 p-4">
+              <p className="text-[11.5px] font-medium text-slate-500">{c.label}</p>
+              <p className={`mt-1 text-2xl font-semibold ${c.alert ? "text-red-600" : "text-slate-900"}`}>{c.value}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{c.hint}</p>
             </div>
+          ))}
+        </div>
+
+        <div role="group" aria-label="Filtrar por situação" className="flex flex-wrap gap-1.5">
+          {FILTROS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              aria-pressed={filtro === f.id}
+              onClick={() => setFiltro(f.id)}
+              className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition ${
+                filtro === f.id ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              {f.label}
+              {f.id !== "todas" && <span className="ml-1 opacity-70">{s0[f.id]}</span>}
+            </button>
           ))}
         </div>
 
@@ -138,28 +201,31 @@ export default function NaoConformidadesPage() {
           <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-[13px] text-slate-500">
             Carregando não conformidades…
           </div>
-        ) : itens.length === 0 ? (
+        ) : visiveis.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 border border-dashed border-slate-300 flex flex-col items-center text-center">
             <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
               <CheckCircle2 className="w-5 h-5 text-slate-500" strokeWidth={1.8} />
             </div>
-            <h2 className="text-[15px] font-semibold text-slate-900">Nenhuma não conformidade registrada</h2>
+            <h2 className="text-[15px] font-semibold text-slate-900">
+              {itens.length === 0 ? "Nenhuma não conformidade registrada" : "Nenhuma NC nesta situação"}
+            </h2>
             <p className="text-[12.5px] text-slate-500 mt-1 max-w-sm">
               Quando uma NC for identificada nesta obra, registre aqui para acompanhar o prazo de resolução.
             </p>
           </div>
         ) : (
           <ul className="flex flex-col gap-3">
-            {itens.map((nc) => {
-              const situacao = getNcSituacao(nc, hoje);
+            {visiveis.map((nc) => {
+              const situacao = getNcSituacaoFluxo(nc, hoje);
+              const finalizada = situacao === "encerrada" || situacao === "cancelada";
               const dias = diasAtePrazo(nc.prazo, hoje);
               return (
                 <li key={nc.id} className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${SITUACAO_STYLE[situacao]}`}>
-                          {NC_SITUACOES[situacao]}
+                        <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${SITUACAO_FLUXO_STYLE[situacao]}`}>
+                          {NC_SITUACOES_FLUXO[situacao]}
                         </span>
                         <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${GRAU_STYLE[nc.grau]}`}>
                           Grau {NC_GRAUS[nc.grau]?.toLowerCase() ?? nc.grau}
@@ -176,7 +242,7 @@ export default function NaoConformidadesPage() {
                           <dt className="text-slate-500">Prazo:</dt>
                           <dd className={`font-medium ${situacao === "vencida" ? "text-red-600" : "text-slate-800"}`}>
                             {formatarData(nc.prazo)}
-                            {situacao !== "resolvida" &&
+                            {!finalizada &&
                               ` · ${dias < 0 ? `vencida há ${-dias} dia(s)` : dias === 0 ? "vence hoje" : `faltam ${dias} dia(s)`}`}
                           </dd>
                         </div>
@@ -191,19 +257,36 @@ export default function NaoConformidadesPage() {
                           </dd>
                         </div>
                       </dl>
+                      {nc.temFoto && (
+                        <button
+                          type="button"
+                          onClick={() => void abrirFoto(nc.id)}
+                          disabled={carregandoFotoId === nc.id}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-[12px] font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition disabled:opacity-60"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          {carregandoFotoId === nc.id ? "Carregando foto…" : "Ver foto"}
+                        </button>
+                      )}
                     </div>
-                    {situacao !== "resolvida" && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        loading={resolvendoId === nc.id}
-                        onClick={() => void marcarResolvida(nc.id)}
-                        className="shrink-0"
-                      >
+                    <div className="flex flex-row sm:flex-col sm:items-stretch gap-2 shrink-0">
+                      <Button variant={finalizada ? "secondary" : "primary"} size="sm" onClick={() => setDetalheId(nc.id)}>
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Marcar como resolvida
+                        {finalizada ? "Ver tratamento" : "Abrir tratamento"}
                       </Button>
-                    )}
+                      {nc.acoesTotal > 0 && (
+                        <span className="text-[11px] text-slate-500 text-center">
+                          Plano: {nc.acoesConcluidas} de {nc.acoesTotal} ações
+                        </span>
+                      )}
+                      <PdfDownloadButton
+                        size="sm"
+                        variant="ghost"
+                        build={async () =>
+                          (await import("@/components/documents/nc-document")).fetchNcPdf(nc.id, hoje, activeProject?.code)
+                        }
+                      />
+                    </div>
                   </div>
                 </li>
               );
@@ -215,17 +298,51 @@ export default function NaoConformidadesPage() {
       {modalAberto && (
         <NovaNcModal
           onClose={() => setModalAberto(false)}
-          onSaved={() => {
+          onSaved={(email, destinatario) => {
             setModalAberto(false);
+            setAviso(
+              email.sent
+                ? { ok: true, texto: `Não conformidade registrada. Notificação enviada por e-mail para ${destinatario}.` }
+                : { ok: false, texto: `Não conformidade registrada, mas o e-mail não foi enviado: ${email.reason}` }
+            );
             void carregar();
           }}
         />
+      )}
+
+      {detalheId !== null && (
+        <NcDetailModal
+          ncId={detalheId}
+          projectCode={activeProject?.code}
+          onClose={() => setDetalheId(null)}
+          onChanged={() => void carregar()}
+        />
+      )}
+
+      {fotoAberta && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={() => setFotoAberta(null)}>
+          <div className="absolute inset-0 bg-slate-900/70" />
+          <img src={fotoAberta} alt="Foto da não conformidade" className="relative max-w-full max-h-[90vh] rounded-xl shadow-xl" />
+          <button
+            type="button"
+            aria-label="Fechar foto"
+            className="absolute top-4 right-4 p-2 rounded-xl bg-white/90 text-slate-700 hover:bg-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       )}
     </AppLayout>
   );
 }
 
-function NovaNcModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function NovaNcModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: (email: EmailResultado, destinatario: string) => void;
+}) {
   const { projects, activeProject } = useApp();
   const hoje = hojeIso();
   const [form, setForm] = useState<Partial<NaoConformidadeInput>>(() => ({
@@ -238,6 +355,7 @@ function NovaNcModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const [erros, setErros] = useState<NaoConformidadeErrors>({});
   const [salvando, setSalvando] = useState(false);
   const [erroGeral, setErroGeral] = useState<string | null>(null);
+  const [processandoFoto, setProcessandoFoto] = useState(false);
 
   const set = <K extends keyof NaoConformidadeInput>(k: K, v: NaoConformidadeInput[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -248,6 +366,22 @@ function NovaNcModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     const obra = projects.find((p) => p.id === id);
     setForm((f) => ({ ...f, projectId: id, responsavelNome: obra?.managerName ?? f.responsavelNome }));
     setErros((e) => ({ ...e, projectId: undefined }));
+  };
+
+  const escolherFoto = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErros((e) => ({ ...e, fotoUrl: "Selecione um arquivo de imagem." }));
+      return;
+    }
+    setProcessandoFoto(true);
+    try {
+      set("fotoUrl", await comprimirFoto(file));
+    } catch {
+      setErros((e) => ({ ...e, fotoUrl: "Não foi possível ler esta imagem. Tente uma foto JPEG ou PNG." }));
+    } finally {
+      setProcessandoFoto(false);
+    }
   };
 
   const salvar = async () => {
@@ -265,7 +399,7 @@ function NovaNcModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Falha ao registrar a não conformidade.");
-      onSaved();
+      onSaved(data.email ?? { sent: false, reason: "resultado do envio desconhecido." }, form.responsavelEmail!.trim());
     } catch (e) {
       setErroGeral(e instanceof Error ? e.message : "Falha ao registrar a não conformidade.");
     } finally {
@@ -425,6 +559,43 @@ function NovaNcModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                 />
                 {erro("descricao")}
               </div>
+              <div className="sm:col-span-2">
+                <span className={labelClass}>Foto da NC</span>
+                {form.fotoUrl ? (
+                  <div className="flex items-start gap-3">
+                    <img src={form.fotoUrl} alt="Pré-visualização da foto" className="w-40 h-28 object-cover rounded-xl border border-slate-200" />
+                    <Button variant="secondary" size="sm" onClick={() => set("fotoUrl", null)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Remover foto
+                    </Button>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="nc-foto"
+                    className={`relative flex flex-col items-center justify-center gap-1.5 px-4 py-6 rounded-xl border border-dashed cursor-pointer hover:bg-slate-50 transition ${
+                      erros.fotoUrl ? "border-red-300" : "border-slate-300"
+                    }`}
+                  >
+                    <Camera className="w-5 h-5 text-slate-500" />
+                    <span className="text-[12.5px] font-medium text-slate-700">
+                      {processandoFoto ? "Processando foto…" : "Tirar ou anexar foto"}
+                    </span>
+                    <span className="text-[11.5px] text-slate-500">Opcional · enviada em anexo no e-mail ao responsável</span>
+                    <input
+                      id="nc-foto"
+                      type="file"
+                      accept="image/*"
+                      disabled={processandoFoto}
+                      onChange={(e) => {
+                        void escolherFoto(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                )}
+                {erro("fotoUrl")}
+              </div>
             </div>
           </section>
 
@@ -471,7 +642,7 @@ function NovaNcModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
         <div className="flex-none px-5 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => void salvar()} loading={salvando}>
+          <Button onClick={() => void salvar()} loading={salvando} disabled={processandoFoto}>
             <CheckCircle2 className="w-4 h-4" />
             Registrar NC
           </Button>

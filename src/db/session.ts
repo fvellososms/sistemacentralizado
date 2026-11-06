@@ -3,7 +3,12 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { obras, usuarios } from "@/db/schema";
 import type { Perfil } from "@/lib/apr/types";
+import { resolvePerfilApr } from "@/modules/apr/domain/perfil";
+import { getSessionUser } from "@/modules/users/application/session";
+import { normalizeEmail } from "@/modules/users/domain/rules";
+import { AppError } from "@/shared/errors/AppError";
 
+/** @deprecated No longer read: the APR user comes from the signed session (see getUsuarioAtual). */
 export const COOKIE_USUARIO = "fv_usuario";
 export const COOKIE_OBRA = "fv_obra";
 
@@ -37,61 +42,47 @@ export const DEFAULT_OBRA_SESSAO: ObraSessao = {
   endereco: "Endereço Hotel Marina",
 };
 
+const SESSION_CACHE_TTL_MS = 30_000;
+const usuarioCache = new Map<string, { value: UsuarioSessao; expiresAt: number }>();
+const obraCache = new Map<string, { value: ObraSessao | null; expiresAt: number }>();
+
+/**
+ * APR user of the request, always derived from the signed login session (fv_sessao): the APR row is
+ * found (or created) by the session e-mail. The old fv_usuario cookie is no longer trusted, since any
+ * logged user could set it to act as someone else.
+ */
 export async function getUsuarioAtual(): Promise<UsuarioSessao> {
+  const sessao = await getSessionUser();
+  if (!sessao) throw AppError.unauthorized("Sessão expirada. Entre novamente.");
+  const email = normalizeEmail(sessao.email);
+  const cacheKey = `${sessao.id}:${email}:${sessao.accessLevel}`;
+  const cached = usuarioCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+
   try {
-    const store = await cookies();
-    const raw = store.get(COOKIE_USUARIO)?.value;
-    const id = raw ? Number(raw) : NaN;
-    let rows = Number.isFinite(id)
-      ? await db.select().from(usuarios).where(eq(usuarios.id, id)).limit(1)
-      : [];
-
-    if (rows.length === 0) {
-      rows = await db
-        .select()
-        .from(usuarios)
-        .where(eq(usuarios.email, DEFAULT_USUARIO_SESSAO.email))
-        .limit(1);
+    let [u] = await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1);
+    if (!u) {
+      [u] = await db
+        .insert(usuarios)
+        .values({ nome: sessao.name, email, senhaHash: null, cargo: null, perfil: resolvePerfilApr(null, sessao.accessLevel) })
+        .onConflictDoNothing()
+        .returning();
+      u ??= (await db.select().from(usuarios).where(eq(usuarios.email, email)).limit(1))[0];
     }
-
-    if (rows.length === 0) {
-      rows = await db.select().from(usuarios).orderBy(asc(usuarios.id)).limit(1);
-    }
-
-    if (rows.length === 0) {
-      try {
-        const [inserted] = await db
-          .insert(usuarios)
-          .values({
-            nome: DEFAULT_USUARIO_SESSAO.nome,
-            email: DEFAULT_USUARIO_SESSAO.email,
-            senhaHash: "senha12345678",
-            cargo: DEFAULT_USUARIO_SESSAO.cargo,
-            perfil: DEFAULT_USUARIO_SESSAO.perfil,
-          })
-          .onConflictDoNothing()
-          .returning();
-
-        if (inserted) {
-          return {
-            id: inserted.id,
-            nome: inserted.nome,
-            email: inserted.email,
-            cargo: inserted.cargo,
-            perfil: inserted.perfil,
-          };
-        }
-      } catch {
-        // Fallback em caso de indisponibilidade
-      }
-      return DEFAULT_USUARIO_SESSAO;
-    }
-
-    const u = rows[0];
-    return { id: u.id, nome: u.nome, email: u.email, cargo: u.cargo, perfil: u.perfil };
+    if (!u) throw new Error("Usuário da APR não encontrado após o cadastro.");
+    const result: UsuarioSessao = {
+      id: u.id,
+      nome: u.nome,
+      email: u.email,
+      cargo: u.cargo,
+      perfil: resolvePerfilApr(u.perfil, sessao.accessLevel),
+    };
+    usuarioCache.set(cacheKey, { value: result, expiresAt: Date.now() + SESSION_CACHE_TTL_MS });
+    return result;
   } catch (error) {
-    console.warn("getUsuarioAtual: banco indisponível, retornando fallback.", error);
-    return DEFAULT_USUARIO_SESSAO;
+    // Without the database nothing is saved anyway; the fallback never carries extra permissions.
+    console.warn("getUsuarioAtual: banco indisponível, usando apenas a sessão.", error);
+    return { id: 0, nome: sessao.name, email, cargo: null, perfil: "colaborador" };
   }
 }
 
@@ -99,6 +90,12 @@ export async function getObraAtual(): Promise<ObraSessao | null> {
   try {
     const store = await cookies();
     const raw = store.get(COOKIE_OBRA)?.value;
+    const cacheKey = raw ?? "__default__";
+    const cached = obraCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.value;
+    }
+
     const id = raw ? Number(raw) : NaN;
     let rows = Number.isFinite(id)
       ? await db.select().from(obras).where(eq(obras.id, id)).limit(1)
@@ -122,12 +119,14 @@ export async function getObraAtual(): Promise<ObraSessao | null> {
           .returning();
 
         if (inserted) {
-          return {
+          const result = {
             id: inserted.id,
             codigo: inserted.codigo,
             nome: inserted.nome,
             endereco: inserted.endereco,
           };
+          obraCache.set(cacheKey, { value: result, expiresAt: Date.now() + SESSION_CACHE_TTL_MS });
+          return result;
         }
       } catch {
         // Fallback em caso de indisponibilidade
@@ -136,7 +135,9 @@ export async function getObraAtual(): Promise<ObraSessao | null> {
     }
 
     const o = rows[0];
-    return { id: o.id, codigo: o.codigo, nome: o.nome, endereco: o.endereco };
+    const result = { id: o.id, codigo: o.codigo, nome: o.nome, endereco: o.endereco };
+    obraCache.set(cacheKey, { value: result, expiresAt: Date.now() + SESSION_CACHE_TTL_MS });
+    return result;
   } catch (error) {
     console.warn("getObraAtual: banco indisponível, retornando fallback.", error);
     return DEFAULT_OBRA_SESSAO;

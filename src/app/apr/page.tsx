@@ -2,11 +2,13 @@ import Link from "next/link";
 import { AppLayout } from "@/components/AppLayout";
 import { AprStatusBadge } from "@/components/apr/shared";
 import { formatarData } from "@/lib/apr/format";
-import { EmptyState } from "@/components/ui";
+import { Alert, EmptyState } from "@/components/ui";
+import { DATABASE_UNAVAILABLE_MESSAGE } from "@/shared/errors/database-errors";
 import { listarAprs } from "@/lib/apr/repo";
 import { STATUS_LABEL, type AprStatus } from "@/lib/apr/types";
 import { getObraAtual, getUsuarioAtual } from "@/db/session";
 import { NovaAprButton } from "@/components/apr/NovaAprButton";
+import { AprPdfButton } from "@/components/apr/AprPdfButton";
 import type { AprDraft } from "@/lib/apr/types";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +22,7 @@ export default async function AprListaPage({
 }) {
   const sp = await searchParams;
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
-  const obraAtual = await getObraAtual();
-  const usuario = await getUsuarioAtual();
+  const [obraAtual, usuario] = await Promise.all([getObraAtual(), getUsuarioAtual()]);
 
   const inicial: AprDraft = {
     id: null,
@@ -41,8 +42,16 @@ export default async function AprListaPage({
   const status = STATUS.includes(get("status") as AprStatus) ? (get("status") as AprStatus) : undefined;
 
   // A lista mostra apenas as APRs da obra ativa no cabeçalho.
+  // Without the database the page still opens (with a notice) instead of crashing.
+  let bancoIndisponivel = false;
   const itens = obraAtual
-    ? await listarAprs({ obraId: obraAtual.id, status, atividade: get("atividade"), de: get("de"), ate: get("ate"), q: get("q") })
+    ? await listarAprs({ obraId: obraAtual.id, status, atividade: get("atividade"), de: get("de"), ate: get("ate"), q: get("q") }).catch(
+        (error: unknown) => {
+          console.warn("Lista de APR: falha ao consultar o banco.", error);
+          bancoIndisponivel = true;
+          return [] as Awaited<ReturnType<typeof listarAprs>>;
+        }
+      )
     : [];
 
   const resumo = STATUS.map((s) => ({ s, n: itens.filter((i) => i.status === s).length }));
@@ -60,6 +69,12 @@ export default async function AprListaPage({
         </div>
       </div>
 
+
+      {bancoIndisponivel && (
+        <Alert tone="warning" title="Não foi possível carregar as APRs">
+          {DATABASE_UNAVAILABLE_MESSAGE}
+        </Alert>
+      )}
 
       {/* Resumo por situação */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -117,8 +132,11 @@ export default async function AprListaPage({
           {/* Lista mobile (cards) */}
           <ul className="flex flex-col gap-3 md:hidden">
             {itens.map((i) => (
-              <li key={i.id}>
-                <Link href={`/apr/${i.id}`} className="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden block p-4">
+              <li key={i.id} className="relative">
+                <div className="absolute right-2 bottom-2 z-10">
+                  <AprPdfButton aprId={i.id} codigo={i.codigo} appearance="icon" />
+                </div>
+                <Link href={`/apr/${i.id}`} className="bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all overflow-hidden block p-4 pr-12">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-mono text-slate-400">{i.codigo}</span>
                     <AprStatusBadge status={i.status} etapa={i.etapaAtual} />
@@ -147,6 +165,7 @@ export default async function AprListaPage({
                   <th className="px-4 py-3 font-medium">Execução</th>
                   <th className="px-4 py-3 font-medium">Situação</th>
                   <th className="px-4 py-3 font-medium">Atualizada</th>
+                  <th className="px-4 py-3 font-medium text-right"><span className="sr-only">PDF</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-slate-200">
@@ -166,6 +185,9 @@ export default async function AprListaPage({
                     <td className="text-[11px] font-mono text-slate-400 px-4 py-3">{formatarData(i.dataExecucao)}</td>
                     <td className="px-4 py-3"><AprStatusBadge status={i.status} etapa={i.etapaAtual} /></td>
                     <td className="text-[11px] font-mono text-slate-400 px-4 py-3">{formatarData(i.atualizadoEm.toISOString(), true)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <AprPdfButton aprId={i.id} codigo={i.codigo} appearance="icon" />
+                    </td>
                   </tr>
                 ))}
               </tbody>

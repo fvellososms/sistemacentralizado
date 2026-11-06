@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { useApp } from "@/context/AppContext";
+import { logout } from "@/components/auth/logout";
+import { PASSWORD_MIN_LENGTH, validatePasswordStrength } from "@/modules/users";
 import {
   User,
   Mail,
@@ -26,7 +28,8 @@ const DEFAULT_AVATAR_URL =
 
 export default function PerfilPage() {
   const router = useRouter();
-  const { profile, refreshProfile } = useApp();
+  const { profile, setProfile } = useApp();
+
 
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -77,8 +80,13 @@ export default function PerfilPage() {
     }
 
     if (showPasswordChange && newPassword) {
-      if (newPassword.length < 6) {
-        setFeedbackMessage({ type: "error", text: "A nova senha deve ter no mínimo 6 caracteres." });
+      if (!currentPassword) {
+        setFeedbackMessage({ type: "error", text: "Informe a senha atual para alterá-la." });
+        return;
+      }
+      const weak = validatePasswordStrength(newPassword, email);
+      if (weak) {
+        setFeedbackMessage({ type: "error", text: weak });
         return;
       }
       if (newPassword !== confirmPassword) {
@@ -102,6 +110,7 @@ export default function PerfilPage() {
           address,
           department,
           avatarUrl,
+          currentPassword: showPasswordChange ? currentPassword : null,
           newPassword: showPasswordChange ? newPassword : null,
         }),
       });
@@ -109,12 +118,14 @@ export default function PerfilPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao salvar");
 
+      if (data.profile) {
+        setProfile(data.profile);
+      }
       setFeedbackMessage({ type: "success", text: "Perfil atualizado com sucesso." });
       setShowPasswordChange(false);
       setNewPassword("");
       setConfirmPassword("");
       setCurrentPassword("");
-      await refreshProfile();
     } catch (err: any) {
       setFeedbackMessage({ type: "error", text: err.message || "Erro ao atualizar perfil." });
     } finally {
@@ -124,19 +135,48 @@ export default function PerfilPage() {
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setAvatarUrl(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new window.Image();
+      img.onload = () => {
+        try {
+          const maxDim = 400;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            setAvatarUrl(canvas.toDataURL("image/jpeg", 0.85));
+            return;
+          }
+        } catch {
+          // fallback to original dataUrl
+        }
+        setAvatarUrl(dataUrl);
+      };
+      img.onerror = () => setAvatarUrl(dataUrl);
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("rdo_user_session");
-      router.push("/login");
-    }
-  };
+
+  const handleLogout = () => void logout(router);
 
   return (
     <AppLayout>
@@ -318,10 +358,19 @@ export default function PerfilPage() {
                 <Lock className="w-3.5 h-3.5" strokeWidth={1.8} />
                 <span>Alteração de senha</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <input
                   type="password"
-                  placeholder="Nova senha (mín. 6 caracteres)"
+                  autoComplete="current-password"
+                  placeholder="Senha atual"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3.5 py-2 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300"
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={`Nova senha (mín. ${PASSWORD_MIN_LENGTH}, letras e números)`}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3.5 py-2 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300"

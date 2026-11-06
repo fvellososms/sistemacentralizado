@@ -5,3 +5,4 @@ export * from "./domain/rules";
 export * from "./domain/operational-evolution";
 export * from "./domain/top-nrs";
 export * from "./domain/draft";
+export * from "./domain/labels";

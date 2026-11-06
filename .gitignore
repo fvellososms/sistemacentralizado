@@ -47,3 +47,5 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
+.vercel
+.env*

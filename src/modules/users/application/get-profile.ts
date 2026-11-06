@@ -1,25 +1,32 @@
-import { db } from "@/db";
-import { userProfiles } from "@/db/schema";
+import { isDatabaseUnavailableError } from "@/shared/errors/database-errors";
+import { AppError } from "@/shared/errors/AppError";
 import { DEFAULT_PROFILE } from "../domain/constants";
+import { isBootstrapAdmin } from "../domain/access";
 import type { UserProfile } from "../domain/types";
+import { defaultUserRepository, type UserRepository } from "../infrastructure/user-repository";
+import { getFallbackProfile, saveFallbackProfile } from "../infrastructure/profile-fallback-store";
+import { MAIN_ADMIN_EMAIL, type SessionUser } from "./session";
+import { toUserProfile } from "./user-mapper";
 
-export async function getProfile(): Promise<UserProfile> {
+/** Profile of the logged-in user. Without the database, falls back to what the session carries. */
+export async function getProfile(session: SessionUser, repo: UserRepository = defaultUserRepository): Promise<UserProfile> {
   try {
-    const profiles = await db.select().from(userProfiles).limit(1);
-    if (!profiles.length) {
-      const [newProfile] = await db
-        .insert(userProfiles)
-        .values({
-          ...DEFAULT_PROFILE,
-          passwordHash: "senha12345678",
-        })
-        .returning();
-      return newProfile as UserProfile;
-    }
-    return profiles[0] as UserProfile;
+    const row = await repo.findById(session.id);
+    if (!row) throw AppError.unauthorized("Usuário não encontrado. Entre novamente.");
+    const profile = toUserProfile(row);
+    if (isBootstrapAdmin(profile.email, MAIN_ADMIN_EMAIL)) saveFallbackProfile(profile);
+    return profile;
   } catch (error) {
-    console.warn("getProfile: database unavailable, returning default profile.");
-    return DEFAULT_PROFILE;
+    if (!isDatabaseUnavailableError(error)) throw error;
+    console.warn("getProfile: banco indisponível, usando os dados da sessão.");
+    const base = isBootstrapAdmin(session.email, MAIN_ADMIN_EMAIL) ? getFallbackProfile() : DEFAULT_PROFILE;
+    return {
+      ...base,
+      id: session.id,
+      name: session.name,
+      email: session.email,
+      accessLevel: session.accessLevel,
+      mustChangePassword: session.mustChangePassword,
+    };
   }
 }
-

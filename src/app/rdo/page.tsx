@@ -10,7 +10,6 @@ import {
   BarChart3,
   Plus,
   Eye,
-  Printer,
   Edit3,
   Trash2,
   CloudSun,
@@ -23,8 +22,11 @@ import {
   HardHat,
 } from "lucide-react";
 import { RdoDetailModal } from "@/components/RdoDetailModal";
+import { PdfDownloadButton } from "@/components/documents/PdfDownloadButton";
+import { invalidateRdoDetailClient } from "@/components/documents/rdo-document";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { RdoModal } from "@/components/RdoModal";
+import { extractErrorMessage, notifySite } from "@/components/ui";
 import { isDayStopped } from "@/modules/rdo";
 
 function RdoContent() {
@@ -78,9 +80,13 @@ function RdoContent() {
     try {
       const res = await fetch(`/api/rdos?projectId=${activeProject.id}`);
       const data = await res.json();
+      if (!res.ok) {
+        notifySite(data.error || "Não foi possível carregar os RDOs.", "danger");
+        return;
+      }
       if (data.rdos) setRdosList(data.rdos);
     } catch (e) {
-      console.error(e);
+      notifySite(extractErrorMessage(e, "Não foi possível carregar os RDOs."), "danger");
     } finally {
       setLoading(false);
     }
@@ -91,7 +97,10 @@ function RdoContent() {
   }, [activeProject]);
 
   useEffect(() => {
-    const handleCreated = () => fetchRdos();
+    const handleCreated = () => {
+      invalidateRdoDetailClient();
+      fetchRdos();
+    };
     window.addEventListener("rdo-created", handleCreated);
     return () => window.removeEventListener("rdo-created", handleCreated);
   }, [activeProject]);
@@ -101,25 +110,22 @@ function RdoContent() {
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/rdos/${rdoToDelete.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        invalidateRdoDetailClient(rdoToDelete.id);
         setRdosList((prev) => prev.filter((r) => r.id !== rdoToDelete.id));
         setRdoToDelete(null);
+        notifySite("RDO excluído com sucesso.", "success");
       } else {
-        alert("Erro ao excluir RDO.");
+        notifySite(data.error || "Erro ao excluir RDO.", "danger");
       }
     } catch (e) {
-      console.error(e);
+      notifySite(extractErrorMessage(e, "Erro ao excluir RDO."), "danger");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handlePrintSingle = (rdoId: number) => {
-    setDetailRdoId(rdoId);
-    setTimeout(() => {
-      window.print();
-    }, 400);
-  };
 
   
   const filteredRdos = useMemo(() => {
@@ -408,19 +414,25 @@ function RdoContent() {
                         >
                           <Eye className="w-4 h-4" strokeWidth={1.8} />
                         </button>
-                        <button
-                          onClick={() => handlePrintSingle(rdo.id)}
-                          className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
-                          title="Imprimir"
-                        >
-                          <Printer className="w-4 h-4" strokeWidth={1.8} />
-                        </button>
+                        <PdfDownloadButton
+                          appearance="icon"
+                          label={`Baixar PDF do RDO #${rdo.rdoNumber}`}
+                          build={async () =>
+                            (await import("@/components/documents/rdo-document")).fetchRdoPdf(rdo.id, activeProject)
+                          }
+                        />
                         <button
                           onClick={() => {
                             fetch(`/api/rdos/${rdo.id}`)
-                              .then((res) => res.json())
-                              .then((data) => {
-                                if (data.rdo) setEditRdoData(data.rdo);
+                              .then(async (res) => {
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok || !data.rdo) {
+                                  throw new Error(data.error || "Não foi possível carregar o RDO para edição.");
+                                }
+                                setEditRdoData(data.rdo);
+                              })
+                              .catch((err) => {
+                                notifySite(extractErrorMessage(err, "Erro ao abrir RDO para edição."), "danger");
                               });
                           }}
                           className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"

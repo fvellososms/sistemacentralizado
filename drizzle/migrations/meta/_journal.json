@@ -22,6 +22,41 @@
       "when": 1793057459065,
       "tag": "0002_quality_nao_conformidades",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793149920200,
+      "tag": "0003_nc_foto",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793815880251,
+      "tag": "0004_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793835649086,
+      "tag": "0005_admin_auth_nc",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793895049700,
+      "tag": "0006_indices_desempenho",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793895761155,
+      "tag": "0007_visitas_colaboradores",
+      "breakpoints": true
     }
   ]
 }

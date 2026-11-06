@@ -5,60 +5,21 @@ import Link from "next/link";
 import logo from "@/assets/images/logofvelloso.png";
 import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
-import {
-  LayoutDashboard,
-  AlertTriangle,
-  FileSpreadsheet,
-  CalendarDays,
-  ShieldCheck,
-  User,
-  LogOut,
-  Plus,
-  Hexagon,
-  ChevronDown,
-} from "lucide-react";
-
-type NavChild = { label: string; href: string };
-type NavItem = {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  subtitle?: string;
-  children?: NavChild[];
-};
+import { logout } from "@/components/auth/logout";
+import { useTaskBoardSummary } from "@/components/workspace/api";
+import { buildNavItems } from "./nav-items";
+import { LogOut, ChevronDown } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { profile, openCreateModal, activeProject } = useApp();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const lateTasks = useTaskBoardSummary()?.late ?? 0;
 
-  const navItems: NavItem[] = [
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "RDO", href: "/rdo", icon: FileSpreadsheet, subtitle: "Diário de obra" },
-    { label: "APR", href: "/apr", icon: AlertTriangle, subtitle: "Análise de riscos" },
-    { label: "RSO", href: "/rso", icon: CalendarDays, subtitle: "Relatório semanal" },
-    {
-      label: "Qualidade",
-      href: "/dashboard/qualidade",
-      icon: ShieldCheck,
-      children: [
-        { label: "Visão geral", href: "/dashboard/qualidade" },
-        { label: "Não conformidades", href: "/dashboard/qualidade/nao-conformidades" },
-        { label: "Checklist Equipamentos", href: "/dashboard/qualidade/checklist-equipamentos" },
-        { label: "Checklist EPI", href: "/dashboard/qualidade/checklist-epi" },
-        { label: "Inspeções programadas", href: "/dashboard/qualidade/inspecoes" },
-      ],
-    },
-    { label: "Perfil", href: "/perfil", icon: User },
-  ];
+  const navItems = buildNavItems({ isAdmin: profile?.accessLevel === "admin", lateTasks });
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("rdo_user_session");
-      router.push("/login");
-    }
-  };
+  const handleLogout = () => void logout(router);
 
   return (
     <aside
@@ -137,6 +98,7 @@ export function Sidebar() {
             );
 
             if (item.children) {
+              const groupBadge = item.children.reduce((sum, c) => sum + (c.badge?.count ?? 0), 0);
               return (
                 <div key={item.href}>
                   <button
@@ -147,6 +109,7 @@ export function Sidebar() {
                   >
                     {icon}
                     <span className="flex-1 text-left">{item.label}</span>
+                    {!isOpen && groupBadge > 0 && <NavBadge count={groupBadge} title={`${groupBadge} pendência(s) neste grupo`} />}
                     <ChevronDown
                       className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
                       strokeWidth={2}
@@ -160,13 +123,14 @@ export function Sidebar() {
                           <Link
                             key={child.href}
                             href={child.href}
-                            className={`block px-3 py-2 rounded-lg text-[12.5px] font-medium transition ${
+                            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[12.5px] font-medium transition ${
                               isChildActive
                                 ? "bg-white text-slate-900 shadow-sm shadow-white/5"
                                 : "text-slate-400 hover:text-white hover:bg-white/5"
                             }`}
                           >
-                            {child.label}
+                            <span>{child.label}</span>
+                            {child.badge && child.badge.count > 0 && <NavBadge count={child.badge.count} title={child.badge.title} />}
                           </Link>
                         );
                       })}
@@ -202,5 +166,17 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+  );
+}
+
+function NavBadge({ count, title }: { count: number; title: string }) {
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none flex items-center justify-center tabular-nums"
+    >
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }

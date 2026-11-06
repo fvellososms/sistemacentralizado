@@ -1,6 +1,7 @@
 import { listarAprs, salvarApr } from "@/lib/apr/repo";
 import type { AprDraft, AprStatus } from "@/lib/apr/types";
 import { getUsuarioAtual } from "@/db/session";
+import { publicErrorMessage } from "@/shared/http/route-error";
 import { validarDraft } from "@/lib/apr/validacao";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,6 @@ export async function POST(req: Request) {
     return Response.json({ id }, { status: 201 });
   } catch (e) {
     console.error(e);
-    return Response.json({ error: e instanceof Error ? e.message : "Falha ao salvar APR." }, { status: 500 });
+    return Response.json({ error: publicErrorMessage(e, "Falha ao salvar APR.") }, { status: 500 });
   }
 }
