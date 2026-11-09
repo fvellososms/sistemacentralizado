@@ -58,8 +58,8 @@ describe("Client logo", () => {
     assert.equal(logoSlug("Hotel Marina"), "hotel-marina");
     assert.equal(logoSlug("Construção & Cia."), "construcao-cia");
   });
-  it("tries the formats the PDF supports", () => {
-    assert.deepEqual(logoCandidatos("PETMAX"), ["/logos-clientes/petmax.png", "/logos-clientes/petmax.jpg", "/logos-clientes/petmax.jpeg"]);
+  it("tries the accepted formats, SVG first", () => {
+    assert.deepEqual(logoCandidatos("PETMAX"), ["/logos-clientes/petmax.svg", "/logos-clientes/petmax.png", "/logos-clientes/petmax.jpg", "/logos-clientes/petmax.jpeg"]);
   });
   it("has no logo for a project without client company", () => {
     assert.deepEqual(logoCandidatos(null), []);

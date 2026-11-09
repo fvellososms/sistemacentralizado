@@ -91,10 +91,10 @@ export function logoSlug(empresa: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-/** Where the document looks for the logo of the client company (PDF accepts PNG and JPEG). */
+/** Where the document looks for the logo of the client company. */
 export function logoCandidatos(empresa: string | null | undefined): string[] {
   const slug = empresa ? logoSlug(empresa) : "";
-  return slug ? ["png", "jpg", "jpeg"].map((ext) => `/logos-clientes/${slug}.${ext}`) : [];
+  return slug ? ["svg", "png", "jpg", "jpeg"].map((ext) => `/logos-clientes/${slug}.${ext}`) : [];
 }
 
 export interface RespostaInput {

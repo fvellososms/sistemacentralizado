@@ -49,6 +49,3 @@ Thumbs.db
 *.sublime-workspace
 .vercel
 .env*
-
-# Sistema original do checklist (Streamlit), já absorvido em src/modules/checklists
-FVCheck-principal/

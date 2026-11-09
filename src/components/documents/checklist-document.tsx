@@ -308,10 +308,34 @@ async function imagemDoSite(url: string): Promise<string | null> {
   }
 }
 
+const LOGO_LARGURA_PX = 900;
+
+/** The PDF engine does not read SVG files, so vector logos are drawn to a PNG first. */
+async function svgParaPng(svg: string): Promise<string | null> {
+  const viewBox = /viewBox="[^"]*?([\d.]+)[\s,]+([\d.]+)"/.exec(atob(svg.split(",")[1] ?? ""));
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const proporcao = viewBox ? Number(viewBox[1]) / Number(viewBox[2]) : img.naturalWidth / img.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = LOGO_LARGURA_PX;
+      canvas.height = Math.round(LOGO_LARGURA_PX / (proporcao || 1));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(null);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(null);
+    img.src = svg;
+  });
+}
+
 async function primeiraImagem(urls: string[]): Promise<string | null> {
   for (const url of urls) {
     const imagem = await imagemDoSite(url);
-    if (imagem) return imagem;
+    if (!imagem) continue;
+    const convertida = imagem.startsWith("data:image/svg") ? await svgParaPng(imagem) : imagem;
+    if (convertida) return convertida;
   }
   return null;
 }

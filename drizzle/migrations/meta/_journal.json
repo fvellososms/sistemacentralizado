@@ -71,6 +71,13 @@
       "when": 1794246295762,
       "tag": "0009_checklists_equipamentos",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794248932045,
+      "tag": "0010_obra_fabrica_petmax",
+      "breakpoints": true
     }
   ]
 }

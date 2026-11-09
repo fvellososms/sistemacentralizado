@@ -4,11 +4,11 @@ A logo do cabeçalho do checklist de equipamentos vem desta pasta. Ela é escolh
 empresa cliente vinculada à obra (Administração > Obras).
 
 **Nome do arquivo:** o nome da empresa em minúsculas, sem acentos e com hífen no lugar de espaços.
-**Formatos aceitos:** PNG ou JPG.
+**Formatos aceitos:** SVG, PNG ou JPG. Se houver mais de um, vale o SVG.
 
 | Empresa        | Arquivo              |
 | -------------- | -------------------- |
-| PETMAX         | `petmax.png`         |
+| PETMAX         | `petmax.svg`         |
 | Hotel Marina   | `hotel-marina.png`   |
 | Grupo CTV      | `grupo-ctv.png`      |
 | Tetris         | `tetris.png`         |
