@@ -477,3 +477,68 @@ export const rateLimits = pgTable("rate_limits", {
   count: integer("count").notNull().default(0),
   resetAt: bigint("reset_at", { mode: "number" }).notNull(), // unix seconds
 });
+
+// Modelos de checklist de equipamentos (lista de perguntas de cada equipamento, importada de CSV).
+export const checklistModelos = pgTable("checklist_modelos", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull().unique(),
+  ativo: boolean("ativo").notNull().default(true),
+  atualizadoEm: timestamp("atualizado_em").defaultNow().notNull(),
+});
+
+export const checklistModeloItens = pgTable("checklist_modelo_itens", {
+  id: serial("id").primaryKey(),
+  modeloId: integer("modelo_id").notNull().references(() => checklistModelos.id, { onDelete: "cascade" }),
+  ordem: integer("ordem").notNull(),
+  pergunta: text("pergunta").notNull(),
+  icone: varchar("icone", { length: 120 }),
+}, (t) => [index("checklist_modelo_itens_modelo_idx").on(t.modeloId, t.ordem)]);
+
+// Inspeção realizada. Guarda cópia das perguntas e da empresa: mudar o modelo ou a obra não altera o documento.
+export const checklistInspecoes = pgTable("checklist_inspecoes", {
+  id: serial("id").primaryKey(),
+  clientId: varchar("client_id", { length: 36 }).notNull().unique(), // gerado no aparelho; reenviar não duplica
+  modeloId: integer("modelo_id").references(() => checklistModelos.id, { onDelete: "set null" }),
+  modeloNome: varchar("modelo_nome", { length: 255 }).notNull(),
+  projectId: integer("project_id"),
+  projectName: varchar("project_name", { length: 255 }),
+  empresaCliente: varchar("empresa_cliente", { length: 180 }),
+  numero: varchar("numero", { length: 255 }).notNull().default(""),
+  revisao: varchar("revisao", { length: 255 }).notNull().default(""),
+  contratada: varchar("contratada", { length: 255 }).notNull().default(""),
+  subcontratada: varchar("subcontratada", { length: 255 }).notNull().default(""),
+  local: varchar("local", { length: 255 }).notNull().default(""),
+  grupo: varchar("grupo", { length: 255 }).notNull().default(""),
+  frente: varchar("frente", { length: 255 }).notNull().default(""),
+  objeto: varchar("objeto", { length: 255 }).notNull().default(""),
+  tag: varchar("tag", { length: 255 }).notNull().default(""),
+  periodicidade: varchar("periodicidade", { length: 255 }).notNull().default(""),
+  inspetor: varchar("inspetor", { length: 255 }).notNull().default(""),
+  dataInspecao: varchar("data_inspecao", { length: 10 }).notNull(), // YYYY-MM-DD
+  nomeTecnico: varchar("nome_tecnico", { length: 255 }).notNull().default(""),
+  nomeOperador: varchar("nome_operador", { length: 255 }).notNull().default(""),
+  assinaturaTecnico: text("assinatura_tecnico"), // PNG (data URL)
+  assinaturaOperador: text("assinatura_operador"),
+  criadoPorId: integer("criado_por_id"),
+  criadoPorNome: varchar("criado_por_nome", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [index("checklist_inspecoes_project_data_idx").on(t.projectId, t.dataInspecao)]);
+
+export const checklistRespostas = pgTable("checklist_respostas", {
+  id: serial("id").primaryKey(),
+  inspecaoId: integer("inspecao_id").notNull().references(() => checklistInspecoes.id, { onDelete: "cascade" }),
+  ordem: integer("ordem").notNull(),
+  pergunta: text("pergunta").notNull(),
+  icone: varchar("icone", { length: 120 }),
+  resposta: varchar("resposta", { length: 20 }).notNull(), // Conforme, Não conforme, Não se aplica
+  comentario: text("comentario").notNull().default(""),
+}, (t) => [index("checklist_respostas_inspecao_idx").on(t.inspecaoId, t.ordem)]);
+
+// As fotos ficam no Supabase Storage; aqui só o caminho do arquivo.
+export const checklistFotos = pgTable("checklist_fotos", {
+  id: serial("id").primaryKey(),
+  inspecaoId: integer("inspecao_id").notNull().references(() => checklistInspecoes.id, { onDelete: "cascade" }),
+  ordem: integer("ordem").notNull(),
+  caminho: varchar("caminho", { length: 255 }).notNull(),
+  tipo: varchar("tipo", { length: 40 }).notNull(),
+}, (t) => [uniqueIndex("checklist_fotos_inspecao_ordem_idx").on(t.inspecaoId, t.ordem)]);

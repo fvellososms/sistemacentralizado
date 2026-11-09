@@ -88,7 +88,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           typeof window !== "undefined"
             ? Number(localStorage.getItem("rdo_active_project_id"))
             : NaN;
-        const targetId = prev?.id ?? (!isNaN(savedId) ? savedId : undefined);
+        // The saved choice wins: `prev` starts as the first static project, not as what the user selected.
+        const targetId = savedId > 0 ? savedId : prev?.id;
         if (targetId !== undefined) {
           const found = all.find((p: Project) => p.id === targetId);
           if (found) {

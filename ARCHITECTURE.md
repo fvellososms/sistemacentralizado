@@ -89,6 +89,9 @@ src/
 
 ---
 
+### Checklists de equipamentos (`src/modules/checklists`)
+Absorvido do FVCheck (Streamlit, Davi Mello Ferreira, em colaboração com a FVelloso). Os modelos vêm de CSV e cada inspeção guarda cópia das perguntas. Fotos ficam em bucket privado do Supabase Storage (`SUPABASE_SECRET_KEY`) e são servidas por rota autenticada. O PDF (`components/documents/checklist-document.tsx`) reproduz o layout original. A logo do cabeçalho vem de `public/logos-clientes/`, pela empresa vinculada à obra.
+
 ## 3. Responsabilidade das Camadas
 
 ### 3.1. Camada de Domínio (`domain/`)

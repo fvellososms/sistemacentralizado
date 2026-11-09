@@ -64,6 +64,13 @@
       "when": 1793977759262,
       "tag": "0008_limite_tentativas",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794246295762,
+      "tag": "0009_checklists_equipamentos",
+      "breakpoints": true
     }
   ]
 }

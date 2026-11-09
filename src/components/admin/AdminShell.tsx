@@ -12,6 +12,7 @@ export const ADMIN_TABS = [
   { href: "/admin/usuarios", label: "Usuários" },
   { href: "/admin/empresas", label: "Empresas clientes" },
   { href: "/admin/obras", label: "Obras" },
+  { href: "/admin/checklists", label: "Checklists" },
   { href: "/admin/auditoria", label: "Auditoria" },
 ];
 
