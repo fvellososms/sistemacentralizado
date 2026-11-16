@@ -46,20 +46,13 @@ export default function LoginPage() {
       }
 
       if (typeof window !== "undefined") {
-        const previousSession = parseStoredUserSession(localStorage.getItem("rdo_user_session"));
-        const resolvedAvatar =
-          data.profile?.avatarUrl === DEFAULT_PROFILE.avatarUrl &&
-          previousSession?.avatarUrl &&
-          previousSession.avatarUrl !== DEFAULT_PROFILE.avatarUrl
-            ? previousSession.avatarUrl
-            : data.profile?.avatarUrl;
-
+        // Only what the server returned: no photo or personal data carried over from an older session.
         const sessionPayload = {
           ...(data.profile || {}),
           email: data.profile?.email || email,
-          name: data.profile?.name || "Alberto Martins",
-          role: data.profile?.role || "Encarregado Geral de Obra",
-          avatarUrl: resolvedAvatar || data.profile?.avatarUrl || DEFAULT_PROFILE.avatarUrl,
+          name: data.profile?.name || "",
+          role: data.profile?.role || "",
+          avatarUrl: data.profile?.avatarUrl || null,
           loggedAt: new Date().toISOString(),
         };
 

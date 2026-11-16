@@ -78,3 +78,19 @@ describe("checklists domain calculations", () => {
     assert.equal(result.totalPending, 3);
   });
 });
+
+describe("Compliance from saved inspections", async () => {
+  const { calculateComplianceFromCounts } = await import("./checklists.ts");
+  it("adds up the answers and ignores 'não se aplica'", () => {
+    const r = calculateComplianceFromCounts([
+      { conformes: 9, naoConformes: 1, naoAplica: 2 },
+      { conformes: 6, naoConformes: 4, naoAplica: 0 },
+    ]);
+    assert.equal(r.percentage, 75);
+    assert.equal(r.conformCount, 15);
+    assert.equal(r.evaluatedCount, 20);
+  });
+  it("shows no percentage without inspections", () => {
+    assert.equal(calculateComplianceFromCounts([]).percentage, null);
+  });
+});

@@ -29,7 +29,7 @@ export interface ObraSessao {
 
 export const DEFAULT_USUARIO_SESSAO: UsuarioSessao = {
   id: 1,
-  nome: "Alberto Martins",
+  nome: "Fábio Velloso",
   email: "fvellososms@gmail.com",
   cargo: "Encarregado Geral de Obra",
   perfil: "admin_sst",
@@ -84,6 +84,20 @@ export async function getUsuarioAtual(): Promise<UsuarioSessao> {
     console.warn("getUsuarioAtual: banco indisponível, usando apenas a sessão.", error);
     return { id: 0, nome: sessao.name, email, cargo: null, perfil: "colaborador" };
   }
+}
+
+/**
+ * The APR screens use their own table of projects (obras), matched to the header's project by code.
+ * Returns the matching row, creating it the first time that project is used in the APR.
+ */
+export async function garantirObra(projeto: { codigo: string; nome: string; endereco: string | null }): Promise<number> {
+  const buscar = async () => (await db.select({ id: obras.id }).from(obras).where(eq(obras.codigo, projeto.codigo)).limit(1))[0];
+  const existente = await buscar();
+  if (existente) return existente.id;
+  await db.insert(obras).values({ ...projeto, ativo: true }).onConflictDoNothing();
+  const criada = await buscar();
+  if (!criada) throw new Error("Obra da APR não encontrada após o cadastro.");
+  return criada.id;
 }
 
 export async function getObraAtual(): Promise<ObraSessao | null> {

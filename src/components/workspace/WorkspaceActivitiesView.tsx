@@ -46,7 +46,7 @@ type Variant = "overview" | ActivitySource;
 
 const COPY: Record<Variant, { title: string; description: string; table: string; slug: string }> = {
   overview: {
-    title: "Visão geral",
+    title: "Painel de atividades",
     description: "Acompanhe as entregas e a produtividade do setor técnico.",
     table: "Detalhamento das atividades",
     slug: "visao-geral",

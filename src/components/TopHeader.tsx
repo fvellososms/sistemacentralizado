@@ -4,13 +4,15 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import logo from "@/assets/images/logofvelloso.png";
+import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
+import { telaUsaObraAtiva } from "@/shared/navigation/obra-scope";
+import { UserAvatar } from "./UserAvatar";
 import {
   Building2,
   Calendar,
   AlertCircle,
   ChevronDown,
-  Bell,
 } from "lucide-react";
 
 export function TopHeader() {
@@ -23,6 +25,7 @@ export function TopHeader() {
     hasLocalDraft,
   } = useApp();
 
+  const pathname = usePathname();
   const todayFormatted = new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",
     day: "numeric",
@@ -84,14 +87,7 @@ export function TopHeader() {
               </button>
             )}
             <Link href="/perfil" className="block">
-              <img
-                src={
-                  profile?.avatarUrl ||
-                  "https://images.pexels.com/photos/8960995/pexels-photo-8960995.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800"
-                }
-                alt="Avatar"
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-200"
-              />
+              <UserAvatar name={profile?.name} url={profile?.avatarUrl} className="w-8 h-8 text-[11px] ring-2 ring-slate-200" />
             </Link>
           </div>
         </div>
@@ -154,17 +150,14 @@ export function TopHeader() {
                 <span>Rascunho pendente</span>
               </button>
             )}
-
-            <button
-              type="button"
-              className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
-              title="Notificações"
-            >
-              <Bell className="w-[18px] h-[18px]" strokeWidth={1.8} />
-            </button>
           </div>
         </div>
       </div>
+      {!telaUsaObraAtiva(pathname) && (
+        <p className="px-4 md:px-8 py-1.5 text-[11.5px] font-medium text-slate-600 bg-slate-50 border-t border-slate-200/60">
+          Esta tela vale para todas as obras. A obra selecionada acima não altera o que aparece aqui.
+        </p>
+      )}
     </header>
   );
 }

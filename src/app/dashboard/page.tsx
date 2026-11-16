@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   CloudSun,
+  FileWarning,
   Plus,
   ArrowRight,
   TrendingUp,
@@ -18,14 +19,14 @@ import {
   CheckCircle2,
   Sparkles,
   ClipboardCheck,
-  AlertCircle,
   ShieldAlert,
 } from "lucide-react";
 import { RdoDetailModal } from "@/components/RdoDetailModal";
+import { ReminderAlerts } from "@/components/workspace/ReminderAlerts";
 import {
   calculateQualityScore,
-  calculateChecklistCompliance,
-  calculateOverdueInspections,
+  calculateComplianceFromCounts,
+  calcularIndicadoresNc,
 } from "@/modules/quality";
 import {
   calculateOperationalEvolution,
@@ -34,10 +35,27 @@ import {
 } from "@/modules/rdo";
 import type { RiskCategoryDistribution } from "@/modules/apr";
 
+interface InspecaoResumo {
+  dataInspecao: string;
+  conformes: number;
+  naoConformes: number;
+  naoAplica: number;
+}
+
+interface OportunidadeResumo {
+  status: string;
+  prazo: string;
+  dataOcorrencia: string;
+}
+
+const hojeIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
 export default function DashboardPage() {
   const { activeProject, openCreateModal } = useApp();
   const [rdosList, setRdosList] = useState<any[]>([]);
   const [riskDistribution, setRiskDistribution] = useState<RiskCategoryDistribution[]>([]);
+  const [inspecoes, setInspecoes] = useState<InspecaoResumo[]>([]);
+  const [oportunidades, setOportunidades] = useState<OportunidadeResumo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRdoId, setSelectedRdoId] = useState<number | null>(null);
 
@@ -75,9 +93,24 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchQualityData = async () => {
+    if (!activeProject) return;
+    try {
+      const [resInspecoes, resOportunidades] = await Promise.all([
+        fetch(`/api/qualidade/checklists/inspecoes?projectId=${activeProject.id}`),
+        fetch(`/api/qualidade/nao-conformidades?projectId=${activeProject.id}`),
+      ]);
+      setInspecoes(resInspecoes.ok ? ((await resInspecoes.json()).inspecoes ?? []) : []);
+      setOportunidades(resOportunidades.ok ? ((await resOportunidades.json()).naoConformidades ?? []) : []);
+    } catch (e) {
+      console.warn("fetchQualityData error:", e);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
     fetchRiskDistribution();
+    fetchQualityData();
   }, [activeProject]);
 
   useEffect(() => {
@@ -90,9 +123,12 @@ export default function DashboardPage() {
   }, [activeProject]);
 
   // Existing KPIs calculations
-  const totalRdos = rdosList.length;
-  const totalHh = rdosList.reduce((acc, r) => acc + (parseFloat(r.totalHh) || 0), 0);
-  const totalOccurrences = rdosList.filter((r) => r.hasOccurrences).length;
+  const hoje = hojeIso();
+  const mesAtual = hoje.slice(0, 7);
+  const rdosDoMes = rdosList.filter((r) => String(r.date).startsWith(mesAtual));
+  const totalRdos = rdosDoMes.length;
+  const totalHh = rdosDoMes.reduce((acc, r) => acc + (parseFloat(r.totalHh) || 0), 0);
+  const totalOccurrences = rdosDoMes.filter((r) => r.hasOccurrences).length;
   const latestRdo = rdosList[0] || null;
   const todayHeadcount = latestRdo?.totalHeadcount || 0;
   const ownHeadcount = latestRdo?.ownTeamCount || 0;
@@ -103,8 +139,8 @@ export default function DashboardPage() {
   const allNonConfs = rdosList.flatMap((r) => r.nonConformitiesList || []);
   const topNrs = calculateTopNrs(allNonConfs);
   const evolutionData = calculateOperationalEvolution(rdosList);
-  const checklistCompliance = calculateChecklistCompliance([]);
-  const overdueInspections = calculateOverdueInspections([]);
+  const checklistCompliance = calculateComplianceFromCounts(inspecoes.filter((i) => i.dataInspecao.startsWith(mesAtual)));
+  const oportunidadesVencidas = calcularIndicadoresNc(oportunidades, hoje).porSituacao.vencida;
 
   return (
     <AppLayout>
@@ -122,7 +158,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <h1 className="text-[22px] md:text-[26px] font-semibold text-slate-900 tracking-tight leading-tight">
-              {activeProject?.name || "Edifício Residencial Horizonte Azul"}
+              {activeProject?.name || "Selecione uma obra"}
             </h1>
             <p className="text-[13px] text-slate-500 mt-1">
               Acompanhe a produção, efetivo e qualidade do canteiro em tempo real.
@@ -138,6 +174,8 @@ export default function DashboardPage() {
           </button>
         </div>
 
+
+        <ReminderAlerts />
         {/* Hero KPI row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           {/* Big HH card */}
@@ -201,15 +239,15 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-baseline gap-1.5 mt-3">
               <span className="text-[40px] font-semibold tracking-tight text-slate-900 leading-none">
-                {qualityScore.toFixed(0)}
+                {totalRdos > 0 ? qualityScore.toFixed(0) : "—"}
               </span>
-              <span className="text-2xl font-semibold text-slate-400">%</span>
+              {totalRdos > 0 && <span className="text-2xl font-semibold text-slate-400">%</span>}
             </div>
             <div className="mt-2 text-[12px] text-slate-500 font-medium">
-              Conforme as normas NR-18 e especificações técnicas
+              {totalRdos > 0 ? "Calculado pelas ocorrências dos RDOs deste mês" : "Sem RDO registrado neste mês"}
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[12px]">
-              <span className="text-emerald-600 font-medium">Ver detalhes</span>
+              <span className="text-emerald-600 font-medium">Abrir qualidade</span>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
             </div>
           </Link>
@@ -238,14 +276,14 @@ export default function DashboardPage() {
                 <Users className="w-4 h-4 text-indigo-600" strokeWidth={2} />
               </div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                Hoje
+                Último RDO
               </span>
             </div>
             <div className="text-2xl font-semibold text-slate-900 tracking-tight">
               {todayHeadcount}
             </div>
             <div className="text-[12px] text-slate-500 mt-0.5">
-              {ownHeadcount} próp + {contractorHeadcount} terc
+              {latestRdo ? `${ownHeadcount} próp + ${contractorHeadcount} terc` : "Sem RDO registrado"}
             </div>
           </div>
 
@@ -262,7 +300,7 @@ export default function DashboardPage() {
               {totalOccurrences}
             </div>
             <div className="text-[12px] text-slate-500 mt-0.5">
-              {totalOccurrences === 0 ? "Nenhuma no período" : "Tratadas e arquivadas"}
+              {totalOccurrences === 0 ? "Nenhuma neste mês" : "RDO(s) com ocorrência neste mês"}
             </div>
           </div>
 
@@ -276,12 +314,14 @@ export default function DashboardPage() {
               </span>
             </div>
             <div className="text-[15px] font-semibold text-slate-900 tracking-tight leading-tight">
-              {latestRdo?.weatherMorning === "chuva" ? "🌧️ Chuva" : "☀️ Estável"}
+              {!latestRdo ? "Sem dados" : latestRdo.weatherMorning === "chuva" ? "🌧️ Chuva" : "☀️ Estável"}
             </div>
-            <div className="text-[12px] text-emerald-600 font-medium mt-0.5">
-              {latestRdo?.workCondition === "impraticavel"
-                ? "Impraticável"
-                : "Canteiro praticável"}
+            <div className={`text-[12px] font-medium mt-0.5 ${latestRdo ? "text-emerald-600" : "text-slate-500"}`}>
+              {!latestRdo
+                ? "Sem RDO registrado"
+                : latestRdo.workCondition === "impraticavel"
+                  ? "Impraticável"
+                  : "Canteiro praticável"}
             </div>
           </div>
         </div>
@@ -289,7 +329,7 @@ export default function DashboardPage() {
         {/* Incremental Small Cards: Checklists, Inspeções Vencidas e Top 3 NRs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Card: Conformidade dos checklists */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
+          <Link href="/dashboard/qualidade/checklist-equipamentos" className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-slate-300 transition">
             <div className="flex items-center justify-between mb-3">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
                 <ClipboardCheck className="w-4 h-4 text-emerald-600" strokeWidth={2} />
@@ -298,55 +338,39 @@ export default function DashboardPage() {
                 Checklists
               </span>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-semibold text-slate-900 tracking-tight">
-                {checklistCompliance.percentage !== null
-                  ? `${checklistCompliance.percentage}%`
-                  : "—"}
-              </span>
+            <div className="text-2xl font-semibold text-slate-900 tracking-tight">
+              {checklistCompliance.percentage !== null ? `${checklistCompliance.percentage}%` : "—"}
             </div>
             <div className="text-[13px] font-semibold text-slate-900 tracking-tight mt-1">
               Conformidade dos checklists
             </div>
             <div className="text-[12px] text-slate-500 mt-0.5">
               {checklistCompliance.percentage !== null
-                ? `${checklistCompliance.conformCount} de ${checklistCompliance.evaluatedCount} itens conformes`
-                : "Sem checklists avaliados no período"}
+                ? `${checklistCompliance.conformCount} de ${checklistCompliance.evaluatedCount} itens conformes neste mês`
+                : "Nenhuma inspeção neste mês"}
             </div>
-          </div>
+          </Link>
 
-          {/* Card: Inspeções vencidas */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
+          {/* Card: Oportunidades de Melhoria vencidas */}
+          <Link href="/dashboard/qualidade/nao-conformidades" className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-slate-300 transition">
             <div className="flex items-center justify-between mb-3">
-              <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                  overdueInspections.overdueCount > 0
-                    ? "bg-rose-50 text-rose-600"
-                    : "bg-amber-50 text-amber-600"
-                }`}
-              >
-                <AlertCircle className="w-4 h-4" strokeWidth={2} />
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${oportunidadesVencidas > 0 ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"}`}>
+                <FileWarning className="w-4 h-4" strokeWidth={2} />
               </div>
               <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                Inspeções
+                Prazos
               </span>
             </div>
-            <div
-              className={`text-2xl font-semibold tracking-tight ${
-                overdueInspections.overdueCount > 0 ? "text-rose-600" : "text-slate-900"
-              }`}
-            >
-              {String(overdueInspections.overdueCount).padStart(2, "0")}
+            <div className={`text-2xl font-semibold tracking-tight ${oportunidadesVencidas > 0 ? "text-rose-600" : "text-slate-900"}`}>
+              {oportunidadesVencidas}
             </div>
             <div className="text-[13px] font-semibold text-slate-900 tracking-tight mt-1">
-              Inspeções vencidas
+              Oportunidades vencidas
             </div>
             <div className="text-[12px] text-slate-500 mt-0.5">
-              {overdueInspections.overdueCount > 0
-                ? "Inspeções pendentes com prazo expirado"
-                : "Nenhuma inspeção em atraso"}
+              {oportunidadesVencidas > 0 ? "Com prazo de tratamento expirado" : "Nenhuma com prazo expirado"}
             </div>
-          </div>
+          </Link>
 
           {/* Card: Top 3 NRs com não conformidades */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 flex flex-col justify-between">

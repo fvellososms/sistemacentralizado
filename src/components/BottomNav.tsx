@@ -3,9 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useApp } from "@/context/AppContext";
-import { useTaskBoardSummary } from "@/components/workspace/api";
+import { useReminderSummary, useTaskBoardSummary } from "@/components/workspace/api";
 import { MobileMoreSheet } from "./MobileMoreSheet";
+import { MobileCreateSheet } from "./MobileCreateSheet";
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -16,13 +16,15 @@ import {
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { openCreateModal } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const lateTasks = useTaskBoardSummary()?.late ?? 0;
+  const reminderAlerts = useReminderSummary()?.alertas.length ?? 0;
 
   return (
     <>
     {menuOpen && <MobileMoreSheet onClose={() => setMenuOpen(false)} />}
+    {createOpen && <MobileCreateSheet onClose={() => setCreateOpen(false)} />}
     <nav className="md:hidden fixed bottom-4 left-3 right-3 z-40">
       <div
         className="relative flex items-center justify-between px-2 py-2 rounded-3xl shadow-2xl shadow-slate-900/30 backdrop-blur-xl border border-white/10 text-white"
@@ -57,12 +59,13 @@ export function BottomNav() {
         {/* Center FAB */}
         <div className="relative -top-5 flex flex-col items-center">
           <button
-            onClick={() => openCreateModal()}
+            onClick={() => setCreateOpen(true)}
+            aria-haspopup="dialog"
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl border-4 border-slate-50 transition active:scale-95 hover:scale-105"
             style={{
               background: "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
             }}
-            aria-label="Criar novo RDO"
+            aria-label="Criar novo registro"
           >
             <Plus className="w-7 h-7" strokeWidth={2.5} />
           </button>
@@ -84,7 +87,7 @@ export function BottomNav() {
           <span className="text-[10px] mt-0.5 font-medium">APR</span>
         </Link>
 
-        {/* RSO, Qualidade, Espaço de trabalho, Administração and Perfil live in this sheet on phones. */}
+        {/* The rest of the menu lives in this sheet on phones. */}
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
@@ -93,7 +96,7 @@ export function BottomNav() {
         >
           <Menu className="w-[20px] h-[20px]" strokeWidth={1.7} />
           <span className="text-[10px] mt-0.5 font-medium">Mais</span>
-          {lateTasks > 0 && <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-500" aria-label="Há tarefas atrasadas" />}
+          {lateTasks + reminderAlerts > 0 && <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-500" aria-label="Há tarefas atrasadas ou lembretes pendentes" />}
         </button>
       </div>
     </nav>

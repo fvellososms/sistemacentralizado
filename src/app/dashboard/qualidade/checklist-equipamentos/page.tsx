@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus, Wrench } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui";
@@ -25,9 +26,22 @@ const SEM_INSPECOES: InspecaoResumo[] = [];
 const dataBr = (iso: string) => iso.split("-").reverse().join("/");
 
 export default function ChecklistEquipamentosPage() {
+  return (
+    <Suspense>
+      <ChecklistComParametros />
+    </Suspense>
+  );
+}
+
+function ChecklistComParametros() {
+  const nova = useSearchParams().get("nova");
+  return <ChecklistConteudo key={nova ?? ""} abrirNova={Boolean(nova)} />;
+}
+
+function ChecklistConteudo({ abrirNova }: { abrirNova: boolean }) {
   const { activeProject, profile } = useApp();
   const projectId = activeProject?.id;
-  const [preenchendo, setPreenchendo] = useState(false);
+  const [preenchendo, setPreenchendo] = useState(abrirNova);
   const [aviso, setAviso] = useState<NoticeState>(null);
 
   const carregar = useCallback(async (): Promise<InspecaoResumo[]> => {

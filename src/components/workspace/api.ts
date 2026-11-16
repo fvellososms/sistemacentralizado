@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WORKSPACE_CLIENT_COMPANIES, summarizeTaskBoard, todayInSaoPaulo, type Activity, type Task, type TaskBoardSummary } from "@/modules/workspace";
+import { WORKSPACE_CLIENT_COMPANIES, summarizeReminders, summarizeTaskBoard, todayInSaoPaulo, type Activity, type Reminder, type ReminderSummary, type Task, type TaskBoardSummary } from "@/modules/workspace";
 import { readApiError } from "./shared";
 
 export const NO_ACTIVITIES: Activity[] = [];
@@ -89,4 +89,67 @@ export function useTaskBoardSummary(): TaskBoardSummary | null {
   }, []);
 
   return summary;
+}
+
+export const NO_REMINDERS: Reminder[] = [];
+
+/** Reminders of the logged user (the server never returns those of other people). */
+export async function fetchReminders(): Promise<Reminder[]> {
+  const res = await fetch("/api/espaco-trabalho/lembretes");
+  if (!res.ok) throw new Error(await readApiError(res, "Não foi possível carregar os lembretes."));
+  const data = await res.json();
+  return Array.isArray(data.reminders) ? data.reminders : [];
+}
+
+/** Fired after a reminder is created, edited, checked or deleted. */
+export const REMINDERS_CHANGED_EVENT = "workspace-reminders-changed";
+
+export function notifyRemindersChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(REMINDERS_CHANGED_EVENT));
+}
+
+let cachedReminders: { at: number; value: ReminderSummary } | null = null;
+
+async function loadReminderSummary(force: boolean): Promise<ReminderSummary> {
+  if (!force && cachedReminders && Date.now() - cachedReminders.at < SUMMARY_TTL_MS) return cachedReminders.value;
+  const value = summarizeReminders(await fetchReminders(), todayInSaoPaulo());
+  cachedReminders = { at: Date.now(), value };
+  return value;
+}
+
+/** Late and today's reminders, for the menu badge and the notice on the home page. */
+export function useReminderSummary(): ReminderSummary | null {
+  const [summary, setSummary] = useState<ReminderSummary | null>(cachedReminders?.value ?? null);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = (force: boolean) =>
+      loadReminderSummary(force)
+        .then((value) => {
+          if (active) setSummary(value);
+        })
+        .catch(() => {
+          // Optional: without data the badge and the notice stay hidden.
+        });
+    void refresh(false);
+    const onChange = () => void refresh(true);
+    window.addEventListener(REMINDERS_CHANGED_EVENT, onChange);
+    return () => {
+      active = false;
+      window.removeEventListener(REMINDERS_CHANGED_EVENT, onChange);
+    };
+  }, []);
+
+  return summary;
+}
+
+/** Marks a reminder as done (or open again) and refreshes every view of the reminders. */
+export async function setReminderDone(id: number, done: boolean): Promise<void> {
+  const res = await fetch(`/api/espaco-trabalho/lembretes/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ done }),
+  });
+  if (!res.ok) throw new Error(await readApiError(res, "Não foi possível atualizar o lembrete."));
+  notifyRemindersChanged();
 }

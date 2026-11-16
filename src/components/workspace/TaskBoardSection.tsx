@@ -43,11 +43,11 @@ const selectClass =
 /**
  * Kanban per collaborator plus task statistics. Independent of the activity filters of the page.
  */
-export function TaskBoardSection({ activityCompanies }: { activityCompanies: string[] }) {
+export function TaskBoardSection({ activityCompanies, abrirNova = false }: { activityCompanies: string[]; abrirNova?: boolean }) {
   const { profile } = useApp();
   const { data: team } = useFetched(fetchTeam, NO_TEAM);
   const { data: tasks, setData: setTasks, loading, error, reload } = useFetched(fetchTasks, NO_TASKS);
-  const [editing, setEditing] = useState<{ task: Task | null; company?: string } | null>(null);
+  const [editing, setEditing] = useState<{ task: Task | null; company?: string } | null>(abrirNova ? { task: null } : null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
   const [notice, setNotice] = useState<NoticeState>(null);

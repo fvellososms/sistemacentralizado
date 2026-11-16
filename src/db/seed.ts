@@ -42,15 +42,10 @@ export async function runSeed() {
 
   // 2. User profile
   await db.insert(userProfiles).values({
-    name: "Alberto Martins",
+    name: "Fábio Velloso",
     email: "fvellososms@gmail.com",
     role: "Encarregado Geral de Obra",
-    cpf: "284.915.738-92",
-    phone: "(11) 98765-4321",
-    birthDate: "1985-06-14",
-    address: "Rua das Palmeiras, 340, Apto 52 - Santana, São Paulo - SP",
     department: "Engenharia & Produção",
-    avatarUrl: "https://images.pexels.com/photos/8960995/pexels-photo-8960995.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
     passwordHash: "senha12345678",
   });
 
@@ -151,7 +146,7 @@ export async function runSeed() {
       observations: item.hasOcc
         ? "Dia com registro de ocorrências operacionais documentadas e tratadas em ata de canteiro."
         : "Serviços transcorreram dentro do cronograma previsto sem intercorrências graves.",
-      authorName: "Alberto Martins",
+      authorName: "Fábio Velloso",
       status: "concluido",
     }).returning();
 
@@ -271,7 +266,7 @@ export async function runSeed() {
     totalHh: "240.0",
     hasOccurrences: false,
     observations: "Execução das estacas hélice contínua e vigas de baldrame.",
-    authorName: "Alberto Martins",
+    authorName: "Fábio Velloso",
     status: "concluido",
   }).returning();
 

@@ -21,10 +21,8 @@ const selectBaseUser = () =>
       name: userProfiles.name,
       email: userProfiles.email,
       role: userProfiles.role,
-      cpf: userProfiles.cpf,
       phone: userProfiles.phone,
       birthDate: userProfiles.birthDate,
-      address: userProfiles.address,
       department: userProfiles.department,
       avatarUrl: userProfiles.avatarUrl,
       passwordHash: userProfiles.passwordHash,
@@ -37,10 +35,8 @@ function withLegacyDefaults(row: {
   name: string;
   email: string;
   role: string;
-  cpf: string | null;
   phone: string | null;
   birthDate: string | null;
-  address: string | null;
   department: string;
   avatarUrl: string | null;
   passwordHash: string | null;

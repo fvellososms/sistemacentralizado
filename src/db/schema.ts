@@ -31,10 +31,8 @@ export const userProfiles = pgTable("user_profiles", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   role: varchar("role", { length: 255 }).notNull().default("Encarregado Geral de Obra"),
-  cpf: varchar("cpf", { length: 50 }),
   phone: varchar("phone", { length: 50 }),
   birthDate: varchar("birth_date", { length: 50 }),
-  address: text("address"),
   department: varchar("department", { length: 255 }).notNull().default("Engenharia & Produção"),
   avatarUrl: text("avatar_url"),
   passwordHash: varchar("password_hash", { length: 255 }).default("123456"),
@@ -542,3 +540,17 @@ export const checklistFotos = pgTable("checklist_fotos", {
   caminho: varchar("caminho", { length: 255 }).notNull(),
   tipo: varchar("tipo", { length: 40 }).notNull(),
 }, (t) => [uniqueIndex("checklist_fotos_inspecao_ordem_idx").on(t.inspecaoId, t.ordem)]);
+
+// Lembretes pessoais do calendário do Espaço de trabalho: cada usuário vê apenas os seus.
+export const workspaceReminders = pgTable("workspace_reminders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => userProfiles.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 180 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  time: varchar("time", { length: 5 }), // HH:MM
+  notes: text("notes"),
+  done: boolean("done").notNull().default(false),
+  doneAt: timestamp("done_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [index("workspace_reminders_user_date_idx").on(t.userId, t.date)]);

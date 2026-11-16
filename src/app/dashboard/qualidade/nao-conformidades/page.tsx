@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Camera, CheckCircle2, FileWarning, Mail, Plus, Trash2, X } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui";
@@ -66,10 +67,23 @@ const labelClass = "block text-[11.5px] font-semibold text-slate-700 mb-1.5";
 type EmailResultado = { sent: true } | { sent: false; reason: string };
 
 export default function NaoConformidadesPage() {
+  return (
+    <Suspense>
+      <NaoConformidadesComParametros />
+    </Suspense>
+  );
+}
+
+function NaoConformidadesComParametros() {
+  const nova = useSearchParams().get("nova");
+  return <NaoConformidadesConteudo key={nova ?? ""} abrirNova={Boolean(nova)} />;
+}
+
+function NaoConformidadesConteudo({ abrirNova }: { abrirNova: boolean }) {
   const { activeProject } = useApp();
   const [itens, setItens] = useState<NaoConformidade[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [modalAberto, setModalAberto] = useState(false);
+  const [modalAberto, setModalAberto] = useState(abrirNova);
   const [detalheId, setDetalheId] = useState<number | null>(null);
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]["id"]>("todas");
   const [fotoAberta, setFotoAberta] = useState<string | null>(null);

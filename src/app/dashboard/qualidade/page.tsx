@@ -1,215 +1,199 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, ClipboardCheck, FileWarning, ShieldCheck } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { EmptyPanel, Panel, readApiError, useFetched } from "@/components/workspace/shared";
+import { useApp } from "@/context/AppContext";
 import {
-  ShieldCheck,
-  ArrowLeft,
-  CheckCircle2,
-  Filter,
-} from "lucide-react";
+  NC_SITUACOES_FLUXO,
+  calculateComplianceFromCounts,
+  calcularIndicadoresNc,
+  getNcSituacaoFluxo,
+} from "@/modules/quality";
+
+interface Oportunidade {
+  id: number;
+  titulo: string;
+  localObra: string;
+  status: string;
+  prazo: string;
+  dataOcorrencia: string;
+  encerradaEm: string | null;
+  resolvidaEm: string | null;
+}
+
+interface Inspecao {
+  id: number;
+  modeloNome: string;
+  tag: string;
+  dataInspecao: string;
+  conformes: number;
+  naoConformes: number;
+  naoAplica: number;
+}
+
+interface Dados {
+  oportunidades: Oportunidade[];
+  inspecoes: Inspecao[];
+}
+
+const SEM_DADOS: Dados = { oportunidades: [], inspecoes: [] };
+const LIMITE_LISTA = 5;
+const hojeIso = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+const dataBr = (iso: string) => iso.split("-").reverse().join("/");
+
+function Indicador({ titulo, valor, detalhe, destaque }: { titulo: string; valor: string; detalhe: string; destaque?: "verde" | "vermelho" }) {
+  const cor = destaque === "verde" ? "text-emerald-600" : destaque === "vermelho" ? "text-red-600" : "text-slate-900";
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
+      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">{titulo}</span>
+      <div className={`text-[26px] font-semibold mt-2 tracking-tight tabular-nums ${cor}`}>{valor}</div>
+      <div className="text-[11.5px] text-slate-500 mt-0.5">{detalhe}</div>
+    </div>
+  );
+}
+
+function VerTodas({ href, texto }: { href: string; texto: string }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-1 text-[12px] font-medium text-slate-600 hover:text-slate-900">
+      {texto}
+      <ArrowRight className="w-3.5 h-3.5" />
+    </Link>
+  );
+}
 
 export default function QualidadePage() {
-  const [filterSeverity, setFilterSeverity] = useState<string>("all");
+  const { activeProject } = useApp();
+  const projectId = activeProject?.id;
 
-  const nonConformitiesList = [
-    {
-      id: 1,
-      rdoNumber: 139,
-      date: "02/09/2026",
-      area: "Bloco A · 5º Pavimento",
-      title: "Falta de guarda-corpo provisório na abertura do poço de ventilação",
-      severity: "alta",
-      action: "Instalado imediatamente guarda-corpo duplo em madeira compensada com altura de 1,20m e rodapé de 20cm conforme NR-18.",
-      technician: "Téc. Marcos Vinicius",
-    },
-    {
-      id: 2,
-      rdoNumber: 137,
-      date: "31/08/2026",
-      area: "Bloco B · 3º Pavimento",
-      title: "Espaçadores plásticos insuficientes na armadura do pilar P18",
-      severity: "media",
-      action: "Reposicionados espaçadores tipo roseta garantindo cobrimento mínimo de 2,5 cm antes da concretagem.",
-      technician: "Alberto Martins",
-    },
-    {
-      id: 3,
-      rdoNumber: 135,
-      date: "28/08/2026",
-      area: "Subsolo 1 · Garagem",
-      title: "Acúmulo pontual de água pluvial próximo ao quadro elétrico provisório",
-      severity: "alta",
-      action: "Instalada bomba submersível sapo para drenagem e elevado quadro provisório para 1,50m do piso.",
-      technician: "Téc. Marcos Vinicius",
-    },
-    {
-      id: 4,
-      rdoNumber: 133,
-      date: "26/08/2026",
-      area: "Fachada Leste",
-      title: "Linha de vida sem laudo atualizado de inspeção visual semanal",
-      severity: "baixa",
-      action: "Realizada inspeção e assinado checklist técnico com fita de aprovação verde.",
-      technician: "Alberto Martins",
-    },
-  ];
+  const carregar = useCallback(async (): Promise<Dados> => {
+    if (!projectId) return SEM_DADOS;
+    const [resOportunidades, resInspecoes] = await Promise.all([
+      fetch(`/api/qualidade/nao-conformidades?projectId=${projectId}`),
+      fetch(`/api/qualidade/checklists/inspecoes?projectId=${projectId}`),
+    ]);
+    if (!resOportunidades.ok) throw new Error(await readApiError(resOportunidades, "Não foi possível carregar as oportunidades de melhoria."));
+    if (!resInspecoes.ok) throw new Error(await readApiError(resInspecoes, "Não foi possível carregar as inspeções."));
+    return {
+      oportunidades: (await resOportunidades.json()).naoConformidades ?? [],
+      inspecoes: (await resInspecoes.json()).inspecoes ?? [],
+    };
+  }, [projectId]);
+  const { data, loading, error } = useFetched(carregar, SEM_DADOS);
 
-  const filteredItems = nonConformitiesList.filter(
-    (item) => filterSeverity === "all" || item.severity === filterSeverity
-  );
-
-  const filters = [
-    { id: "all", label: "Todas" },
-    { id: "alta", label: "Alta" },
-    { id: "media", label: "Média" },
-    { id: "baixa", label: "Baixa" },
-  ];
-
-  const severityStyle: Record<string, { dot: string; bg: string; text: string; border: string }> = {
-    alta: { dot: "bg-red-500", bg: "bg-red-50/50", text: "text-red-700", border: "border-red-100" },
-    media: { dot: "bg-amber-500", bg: "bg-amber-50/50", text: "text-amber-700", border: "border-amber-100" },
-    baixa: { dot: "bg-slate-400", bg: "bg-slate-50/50", text: "text-slate-700", border: "border-slate-100" },
-  };
+  const hoje = hojeIso();
+  const { indicadores, emAndamento, conformidade } = useMemo(() => {
+    const indicadores = calcularIndicadoresNc(data.oportunidades, hoje);
+    const emAndamento = data.oportunidades
+      .map((o) => ({ ...o, situacao: getNcSituacaoFluxo(o, hoje) }))
+      .filter((o) => o.situacao !== "encerrada" && o.situacao !== "cancelada")
+      .sort((a, b) => a.prazo.localeCompare(b.prazo));
+    return { indicadores, emAndamento, conformidade: calculateComplianceFromCounts(data.inspecoes) };
+  }, [data, hoje]);
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-900 mb-2 transition"
-          >
+          <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-slate-900 mb-2 transition">
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar ao dashboard</span>
+            <span>Voltar ao início</span>
           </Link>
           <h1 className="text-[20px] md:text-[22px] font-semibold text-slate-900 tracking-tight flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
               <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" strokeWidth={2} />
             </div>
-            <span>Gestão da Qualidade</span>
+            <span>Painel da qualidade</span>
           </h1>
           <p className="text-[12.5px] text-slate-500 mt-1">
-            Conformidades técnicas, normas de segurança NR-18 e auditorias de canteiro.
+            Oportunidades de melhoria e inspeções de equipamentos da obra {activeProject ? `“${activeProject.name}”` : "ativa"}.
           </p>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
-              Índice de Qualidade
-            </span>
-            <div className="text-[26px] font-semibold text-slate-900 mt-2 tracking-tight tabular-nums">
-              96.8<span className="text-slate-400 text-lg">%</span>
+        {error ? (
+          <p role="alert" className="p-4 rounded-xl border border-red-200 bg-red-50 text-[13px] text-red-800">{error}</p>
+        ) : loading ? (
+          <div className="p-10 text-center text-[13px] text-slate-500">Carregando dados da obra…</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Indicador
+                titulo="Em andamento"
+                valor={String(emAndamento.length)}
+                detalhe="Oportunidades ainda não encerradas"
+              />
+              <Indicador
+                titulo="Vencidas"
+                valor={String(indicadores.porSituacao.vencida)}
+                detalhe="Com prazo expirado"
+                destaque={indicadores.porSituacao.vencida > 0 ? "vermelho" : undefined}
+              />
+              <Indicador
+                titulo="Encerradas"
+                valor={String(indicadores.porSituacao.encerrada)}
+                detalhe={indicadores.encerradasNoPrazo === null ? "Nenhuma encerrada ainda" : `${indicadores.encerradasNoPrazo}% dentro do prazo`}
+                destaque={indicadores.porSituacao.encerrada > 0 ? "verde" : undefined}
+              />
+              <Indicador
+                titulo="Conformidade"
+                valor={conformidade.percentage === null ? "—" : `${conformidade.percentage}%`}
+                detalhe={conformidade.percentage === null ? "Nenhuma inspeção nesta obra" : `${conformidade.conformCount} de ${conformidade.evaluatedCount} itens de checklist`}
+              />
             </div>
-            <div className="text-[11.5px] text-emerald-600 font-medium mt-0.5">Meta: &gt; 92%</div>
-          </div>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
-              Apontamentos
-            </span>
-            <div className="text-[26px] font-semibold text-slate-900 mt-2 tracking-tight tabular-nums">
-              {nonConformitiesList.length}
-            </div>
-            <div className="text-[11.5px] text-slate-500 mt-0.5">No mês corrente</div>
-          </div>
+            <Panel
+              title="Oportunidades de melhoria em andamento"
+              description="Ordenadas pelo prazo mais próximo"
+              action={<VerTodas href="/dashboard/qualidade/nao-conformidades" texto="Ver todas" />}
+            >
+              {emAndamento.length === 0 ? (
+                <EmptyPanel title="Nenhuma oportunidade em andamento nesta obra." description="Quando uma for registrada, ela aparece aqui." />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {emAndamento.slice(0, LIMITE_LISTA).map((o) => (
+                    <li key={o.id} className="px-4 sm:px-6 py-3.5 flex items-start gap-3">
+                      <FileWarning className={`w-4 h-4 mt-0.5 shrink-0 ${o.situacao === "vencida" ? "text-red-600" : "text-slate-400"}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13.5px] font-semibold text-slate-900">{o.titulo}</p>
+                        <p className="text-[12px] text-slate-500 mt-0.5">
+                          {o.localObra} · prazo {dataBr(o.prazo)} ·{" "}
+                          <span className={o.situacao === "vencida" ? "text-red-700 font-medium" : ""}>{NC_SITUACOES_FLUXO[o.situacao]}</span>
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
-              Resolvidos
-            </span>
-            <div className="text-[26px] font-semibold text-emerald-600 mt-2 tracking-tight tabular-nums">
-              {nonConformitiesList.length}
-            </div>
-            <div className="text-[11.5px] text-emerald-600 font-medium mt-0.5">100% tratados</div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80">
-            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
-              Tempo Médio
-            </span>
-            <div className="text-[26px] font-semibold text-slate-900 mt-2 tracking-tight tabular-nums">
-              1.8<span className="text-slate-400 text-lg">h</span>
-            </div>
-            <div className="text-[11.5px] text-slate-500 mt-0.5">Resolução no turno</div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 text-[12px] text-slate-500 font-medium">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filtrar:</span>
-          </div>
-          <div className="flex items-center gap-1 p-0.5 bg-white border border-slate-200/80 rounded-xl">
-            {filters.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilterSeverity(f.id)}
-                className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${
-                  filterSeverity === f.id
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <span className="text-[11.5px] text-slate-500 ml-auto">
-            {filteredItems.length} registro{filteredItems.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-
-        {/* List */}
-        <div className="space-y-2.5">
-          {filteredItems.map((item) => {
-            const style = severityStyle[item.severity];
-            return (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all"
-              >
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold uppercase tracking-wider ${style.text} ${style.bg} ${style.border} border`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                        {item.severity}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-400">RDO #{item.rdoNumber}</span>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-[11.5px] text-slate-500 font-medium">{item.date}</span>
-                    </div>
-
-                    <h3 className="text-[14px] font-semibold text-slate-900">{item.title}</h3>
-                    <div className="text-[12px] text-slate-500">
-                      📍 {item.area}
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 text-[12px] text-emerald-900">
-                      <span className="font-semibold">Ação corretiva: </span>
-                      {item.action}
-                    </div>
-                  </div>
-
-                  <div className="flex md:flex-col items-center md:items-end gap-2 shrink-0">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                      <CheckCircle2 className="w-3 h-3" strokeWidth={2.2} />
-                      Resolvido
-                    </span>
-                    <span className="text-[11px] text-slate-500">{item.technician}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+            <Panel
+              title="Últimas inspeções de equipamentos"
+              description={`${data.inspecoes.length} inspeção(ões) nesta obra`}
+              action={<VerTodas href="/dashboard/qualidade/checklist-equipamentos" texto="Ver todas" />}
+            >
+              {data.inspecoes.length === 0 ? (
+                <EmptyPanel title="Nenhuma inspeção registrada nesta obra." description="As inspeções feitas em Checklist Equipamentos aparecem aqui." />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {data.inspecoes.slice(0, LIMITE_LISTA).map((i) => (
+                    <li key={i.id} className="px-4 sm:px-6 py-3.5 flex items-start gap-3">
+                      <ClipboardCheck className="w-4 h-4 mt-0.5 shrink-0 text-slate-400" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13.5px] font-semibold text-slate-900">{i.modeloNome}</p>
+                        <p className="text-[12px] text-slate-500 mt-0.5">
+                          {dataBr(i.dataInspecao)}
+                          {i.tag ? ` · TAG ${i.tag}` : ""} · <span className={i.naoConformes ? "text-red-700 font-medium" : ""}>{i.naoConformes} não conforme(s)</span>
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          </>
+        )}
       </div>
     </AppLayout>
   );

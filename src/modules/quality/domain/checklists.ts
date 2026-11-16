@@ -76,6 +76,19 @@ export function calculateChecklistCompliance(
   };
 }
 
+/** Compliance of saved inspections, from the answer counts of each one. */
+export function calculateComplianceFromCounts(
+  inspections: { conformes: number; naoConformes: number; naoAplica: number }[]
+): ChecklistComplianceResult {
+  return calculateChecklistCompliance(
+    inspections.flatMap((i) => [
+      ...Array<ChecklistItemRecord>(i.conformes).fill({ status: "conforme" }),
+      ...Array<ChecklistItemRecord>(i.naoConformes).fill({ status: "nao_conforme" }),
+      ...Array<ChecklistItemRecord>(i.naoAplica).fill({ status: "nao_se_aplica" }),
+    ])
+  );
+}
+
 export interface InspectionScheduleRecord {
   id: number | string;
   dataLimite: string | Date;

@@ -305,7 +305,7 @@ export function createFallbackRdo(
     totalHh: data.totalHh,
     hasOccurrences,
     observations: data.observations || null,
-    authorName: data.authorName || "Alberto Martins",
+    authorName: data.authorName || "Não informado",
     status: "concluido",
     createdAt: nowIso,
     updatedAt: nowIso,

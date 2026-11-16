@@ -74,14 +74,11 @@ export function mergeUserProfile(
     name: patch.name?.trim() ? patch.name : base.name,
     email: patch.email?.trim() ? patch.email : base.email,
     role: patch.role?.trim() ? patch.role : base.role,
-    cpf: patch.cpf !== undefined ? patch.cpf : base.cpf,
     phone: patch.phone !== undefined ? patch.phone : base.phone,
     birthDate: patch.birthDate !== undefined ? patch.birthDate : base.birthDate,
-    address: patch.address !== undefined ? patch.address : base.address,
     department: patch.department?.trim() ? patch.department : base.department,
-    avatarUrl: patch.avatarUrl !== undefined && patch.avatarUrl !== null && patch.avatarUrl !== ""
-      ? patch.avatarUrl
-      : base.avatarUrl,
+    // An empty photo in the patch means "no photo" (removed), not "keep the previous one".
+    avatarUrl: patch.avatarUrl !== undefined ? patch.avatarUrl || null : base.avatarUrl,
   };
 }
 

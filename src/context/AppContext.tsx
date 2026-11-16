@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import type { Project } from "@/modules/projects/domain/types";
 import { STATIC_PROJECTS } from "@/modules/projects/domain/constants";
@@ -36,6 +37,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalInitialDate, setCreateModalInitialDate] = useState<string | undefined>(undefined);
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const [projetosCarregados, setProjetosCarregados] = useState(false);
+  const router = useRouter();
+  const activeProjectId = activeProject?.id;
 
   const setProfile = (nextProfile: UserProfile) => {
     setProfileState(nextProfile);
@@ -43,13 +47,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const existingSession = parseStoredUserSession(localStorage.getItem("rdo_user_session"));
         if (existingSession) {
+          // Rewritten from the profile only, so fields the system no longer keeps (CPF, address) leave the browser too.
           localStorage.setItem(
             "rdo_user_session",
-            JSON.stringify({
-              ...existingSession,
-              ...nextProfile,
-              loggedAt: existingSession.loggedAt || new Date().toISOString(),
-            })
+            JSON.stringify({ ...nextProfile, loggedAt: existingSession.loggedAt || new Date().toISOString() })
           );
         }
       } catch {
@@ -105,32 +106,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error("Failed to load projects:", e);
       setProjects(STATIC_PROJECTS);
       setActiveProjectState((prev) => prev || STATIC_PROJECTS[0]);
+    } finally {
+      setProjetosCarregados(true);
     }
   };
+
+  // The APR screens read the project on the server: tell it which one is selected in the header.
+  useEffect(() => {
+    if (!projetosCarregados || !activeProjectId) return;
+    fetch("/api/apr/sessao", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: activeProjectId }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.mudou && window.location.pathname.startsWith("/apr")) router.refresh();
+      })
+      .catch(() => undefined);
+  }, [projetosCarregados, activeProjectId, router]);
 
   const refreshProfile = async () => {
     try {
       const res = await fetch("/api/profile");
       if (!res.ok) return;
       const data = await res.json();
-      if (data.profile) {
-        const storedSession =
-          typeof window !== "undefined"
-            ? parseStoredUserSession(localStorage.getItem("rdo_user_session"))
-            : null;
-
-        let resolvedProfile: UserProfile = data.profile;
-        if (
-          storedSession?.avatarUrl &&
-          storedSession.avatarUrl !== DEFAULT_PROFILE.avatarUrl &&
-          resolvedProfile.avatarUrl === DEFAULT_PROFILE.avatarUrl
-        ) {
-          resolvedProfile = mergeUserProfile(resolvedProfile, {
-            avatarUrl: storedSession.avatarUrl,
-          });
-        }
-        setProfile(resolvedProfile);
-      }
+      // The server is the source of truth, including "no photo".
+      if (data.profile) setProfile(data.profile as UserProfile);
     } catch (e) {
       console.error("Failed to load profile:", e);
     }
@@ -141,6 +143,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const storedSession = parseStoredUserSession(localStorage.getItem("rdo_user_session"));
       if (storedSession) {
         setProfileState(mergeUserProfile(DEFAULT_PROFILE, storedSession));
+        // Copies saved before CPF and address left the system are cleaned from the browser (LGPD).
+        const limpo = { ...storedSession } as Record<string, unknown>;
+        if ("cpf" in limpo || "address" in limpo) {
+          delete limpo.cpf;
+          delete limpo.address;
+          try {
+            localStorage.setItem("rdo_user_session", JSON.stringify(limpo));
+          } catch {
+            // ignore storage errors
+          }
+        }
       }
     }
 

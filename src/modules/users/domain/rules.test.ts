@@ -60,12 +60,25 @@ describe("Users Domain Rules", () => {
 
   it("merges user profile updates preserving existing fields", () => {
     const updated = mergeUserProfile(DEFAULT_PROFILE, {
-      name: "Alberto Martins Atualizado",
+      name: "Fábio Velloso Atualizado",
       avatarUrl: "data:image/png;base64,custom",
     });
-    assert.equal(updated.name, "Alberto Martins Atualizado");
+    assert.equal(updated.name, "Fábio Velloso Atualizado");
     assert.equal(updated.avatarUrl, "data:image/png;base64,custom");
     assert.equal(updated.email, DEFAULT_PROFILE.email);
+  });
+
+  it("removes the photo when the update sends it empty", () => {
+    const comFoto = mergeUserProfile(DEFAULT_PROFILE, { avatarUrl: "data:image/png;base64,custom" });
+    assert.equal(mergeUserProfile(comFoto, { avatarUrl: "" }).avatarUrl, null);
+    assert.equal(mergeUserProfile(comFoto, { name: "Outro" }).avatarUrl, "data:image/png;base64,custom");
+  });
+
+  it("does not keep personal data that the system does not use (LGPD)", () => {
+    const merged = mergeUserProfile(DEFAULT_PROFILE, { cpf: "000.000.000-00", address: "Rua X" } as never);
+    assert.equal("cpf" in merged, false);
+    assert.equal("address" in merged, false);
+    assert.equal("cpf" in DEFAULT_PROFILE, false);
   });
 });
 

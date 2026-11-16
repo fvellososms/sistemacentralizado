@@ -257,7 +257,7 @@ async function seedTudo() {
       .insert(usuarios)
       .values([
         { nome: "Carlos Andrade", email: "carlos.andrade@fvelloso.com.br", cargo: "Encarregado de obra", perfil: "colaborador" },
-        { nome: "Alberto Martins", email: "fvellososms@gmail.com", senhaHash: "senha12345678", cargo: "Encarregado Geral de Obra", perfil: "admin_sst" },
+        { nome: "Fábio Velloso", email: "fvellososms@gmail.com", senhaHash: "senha12345678", cargo: "Encarregado Geral de Obra", perfil: "admin_sst" },
         { nome: "Roberto Lima", email: "roberto.lima@fvelloso.com.br", cargo: "Engenheiro de Segurança", perfil: "aprovador" },
       ])
       .returning();

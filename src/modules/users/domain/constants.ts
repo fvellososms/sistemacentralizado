@@ -2,15 +2,12 @@ import type { UserProfile } from "./types";
 
 export const DEFAULT_PROFILE: UserProfile = {
   id: 1,
-  name: "Alberto Martins",
+  name: "Fábio Velloso",
   email: "fvellososms@gmail.com",
   role: "Encarregado Geral de Obra",
-  cpf: "284.915.738-92",
-  phone: "(11) 98765-4321",
-  birthDate: "1985-06-14",
-  address: "Rua das Palmeiras, 340, Apto 52 - Santana, São Paulo - SP",
+  phone: null,
+  birthDate: null,
   department: "Engenharia & Produção",
-  avatarUrl:
-    "https://images.pexels.com/photos/8960995/pexels-photo-8960995.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800",
+  avatarUrl: null, // no photo: the initials of the name are shown
 };
 

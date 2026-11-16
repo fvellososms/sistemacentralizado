@@ -16,10 +16,8 @@ export interface UpdateProfileInput {
   name?: string;
   email?: string;
   role?: string;
-  cpf?: string | null;
   phone?: string | null;
   birthDate?: string | null;
-  address?: string | null;
   department?: string;
   avatarUrl?: string | null;
   currentPassword?: string | null;
@@ -83,10 +81,8 @@ export async function updateProfile(
       name: input.name?.trim() || row.name,
       email,
       role: input.role?.trim() || row.role,
-      cpf: input.cpf !== undefined ? input.cpf : row.cpf,
       phone: input.phone !== undefined ? input.phone : row.phone,
       birthDate: input.birthDate !== undefined ? input.birthDate : row.birthDate,
-      address: input.address !== undefined ? input.address : row.address,
       department: input.department?.trim() || row.department,
       avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl : row.avatarUrl,
     });

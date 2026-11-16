@@ -10,7 +10,7 @@ import { SectionLabel, TaskBoardSection, TaskSummaryCards } from "./TaskBoardSec
 import { Panel, WorkspaceHeader, useFetched } from "./shared";
 
 /** Full-page task board (/espaco-trabalho/tarefas). */
-export function TaskBoardView() {
+export function TaskBoardView({ abrirNova = false }: { abrirNova?: boolean }) {
   // Activities only feed the company suggestions of the task form (collaborators are the system users).
   const { data: activities } = useFetched(fetchActivities, NO_ACTIVITIES);
   const { data: clientCompanies } = useFetched(fetchClientCompanyNames, WORKSPACE_CLIENT_COMPANIES);
@@ -23,7 +23,7 @@ export function TaskBoardView() {
           title="Quadro de tarefas"
           description="Organize o que está por vir, em andamento e entregue, por colaborador. Arraste os cartões entre as colunas."
         />
-        <TaskBoardSection activityCompanies={companies} />
+        <TaskBoardSection activityCompanies={companies} abrirNova={abrirNova} />
       </div>
     </AppLayout>
   );

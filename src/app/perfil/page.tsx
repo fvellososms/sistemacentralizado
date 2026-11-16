@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { useApp } from "@/context/AppContext";
 import { logout } from "@/components/auth/logout";
+import { UserAvatar } from "@/components/UserAvatar";
 import { PASSWORD_MIN_LENGTH, validatePasswordStrength } from "@/modules/users";
 import {
   User,
@@ -23,8 +24,6 @@ import {
   Briefcase,
 } from "lucide-react";
 
-const DEFAULT_AVATAR_URL =
-  "https://images.pexels.com/photos/8960995/pexels-photo-8960995.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1200&w=800";
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -32,13 +31,11 @@ export default function PerfilPage() {
 
 
   const [name, setName] = useState("");
-  const [cpf, setCpf] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [address, setAddress] = useState("");
   const [department, setDepartment] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR_URL);
+  const [avatarUrl, setAvatarUrl] = useState(""); // empty: no photo, the initials are shown
 
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -52,13 +49,11 @@ export default function PerfilPage() {
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
-      setCpf(profile.cpf || "");
       setEmail(profile.email || "");
       setPhone(profile.phone || "");
       setBirthDate(profile.birthDate || "");
-      setAddress(profile.address || "");
-      setDepartment(profile.department || "Engenharia & Produção");
-      setAvatarUrl(profile.avatarUrl || DEFAULT_AVATAR_URL);
+      setDepartment(profile.department || "");
+      setAvatarUrl(profile.avatarUrl || "");
     }
   }, [profile]);
 
@@ -103,13 +98,11 @@ export default function PerfilPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          cpf,
           email,
           phone,
           birthDate,
-          address,
           department,
-          avatarUrl,
+          avatarUrl: avatarUrl || null,
           currentPassword: showPasswordChange ? currentPassword : null,
           newPassword: showPasswordChange ? newPassword : null,
         }),
@@ -210,16 +203,20 @@ export default function PerfilPage() {
         {/* Avatar Card */}
         <div className="bg-white rounded-2xl p-7 border border-slate-200/80 text-center">
           <div className="relative inline-block group">
-            <button
-              type="button"
-              onClick={() => setIsAvatarExpanded(true)}
-              className="relative w-32 h-32 rounded-full overflow-hidden ring-4 ring-slate-100 hover:ring-slate-200 transition"
-            >
-              <img src={avatarUrl} alt="Perfil" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
-                <Maximize2 className="w-6 h-6" />
-              </div>
-            </button>
+            {avatarUrl ? (
+              <button
+                type="button"
+                onClick={() => setIsAvatarExpanded(true)}
+                className="relative w-32 h-32 rounded-full overflow-hidden ring-4 ring-slate-100 hover:ring-slate-200 transition"
+              >
+                <UserAvatar name={name} url={avatarUrl} className="w-full h-full" />
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
+                  <Maximize2 className="w-6 h-6" />
+                </div>
+              </button>
+            ) : (
+              <UserAvatar name={name} url={null} className="w-32 h-32 text-[36px] ring-4 ring-slate-100" />
+            )}
             <label className="absolute bottom-0 right-0 p-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white cursor-pointer shadow-md transition active:scale-95">
               <Camera className="w-3.5 h-3.5" />
               <input
@@ -231,8 +228,15 @@ export default function PerfilPage() {
             </label>
           </div>
 
+          {avatarUrl && (
+            <div>
+              <button type="button" onClick={() => setAvatarUrl("")} className="mt-3 text-[12px] font-medium text-slate-500 hover:text-red-600">
+                Remover foto
+              </button>
+            </div>
+          )}
           <h2 className="text-[17px] font-semibold text-slate-900 mt-4 tracking-tight">
-            {name || "Alberto Martins"}
+            {name || "Usuário"}
           </h2>
           <p className="text-[12.5px] text-slate-500 mt-0.5 flex items-center justify-center gap-1.5">
             <Mail className="w-3.5 h-3.5" strokeWidth={1.8} />
@@ -262,17 +266,6 @@ export default function PerfilPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-[13px] rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300 font-medium transition"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11.5px] font-semibold text-slate-700 mb-1.5">CPF</label>
-              <input
-                type="text"
-                value={cpf}
-                onChange={(e) => setCpf(e.target.value)}
-                placeholder="000.000.000-00"
                 className="w-full px-3.5 py-2.5 text-[13px] rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300 font-medium transition"
               />
             </div>
@@ -338,18 +331,6 @@ export default function PerfilPage() {
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-[11.5px] font-semibold text-slate-700 mb-1.5">
-                Endereço Residencial
-              </label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Rua, número, complemento, bairro, cidade - UF"
-                className="w-full px-3.5 py-2.5 text-[13px] rounded-xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300 font-medium transition"
-              />
-            </div>
           </div>
 
           {showPasswordChange && (
@@ -414,11 +395,8 @@ export default function PerfilPage() {
           onClick={() => setIsAvatarExpanded(false)}
         >
           <div className="bg-white rounded-2xl p-4 max-w-sm w-full shadow-2xl text-center">
-            <img
-              src={avatarUrl}
-              alt="Avatar"
-              className="w-full aspect-square object-cover rounded-xl"
-            />
+            {/* eslint-disable-next-line @next/next/no-img-element -- uploaded photo (data URL) */}
+            <img src={avatarUrl} alt="Foto do perfil" className="w-full aspect-square object-cover rounded-xl" />
             <h3 className="font-semibold text-[15px] text-slate-900 mt-3">{name}</h3>
             <p className="text-[12px] text-slate-500">{department}</p>
             <button

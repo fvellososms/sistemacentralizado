@@ -78,6 +78,27 @@
       "when": 1794248932045,
       "tag": "0010_obra_fabrica_petmax",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794782314030,
+      "tag": "0011_lembretes_calendario",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794784676127,
+      "tag": "0012_lgpd_remove_cpf_endereco",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794784678707,
+      "tag": "0013_usuarios_equipe",
+      "breakpoints": true
     }
   ]
 }

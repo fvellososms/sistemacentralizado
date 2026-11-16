@@ -466,7 +466,6 @@ export function RdoModal({
         hasOccurrences: occurrences.length > 0,
         observations,
         photos,
-        authorName: "Alberto Martins",
       };
 
       let res;

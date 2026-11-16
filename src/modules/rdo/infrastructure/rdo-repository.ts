@@ -325,7 +325,7 @@ export class DrizzleRdoRepository implements RdoRepository {
           totalHh: data.totalHh,
           hasOccurrences,
           observations: data.observations || null,
-          authorName: data.authorName || "Alberto Martins",
+          authorName: data.authorName || "Não informado",
           status: "concluido",
         })
         .returning();

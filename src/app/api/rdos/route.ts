@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRdos, createRdo } from "@/modules/rdo/server";
 import { AppError } from "@/shared/errors/AppError";
+import { requireSession } from "@/modules/users/server";
 
 export async function GET(request: Request) {
   try {
@@ -24,7 +25,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newRdo = await createRdo(body);
+    // The author is whoever is logged in, never a name sent by the form.
+    const newRdo = await createRdo({ ...body, authorName: (await requireSession()).name });
     return NextResponse.json(
       { rdo: newRdo, message: "RDO registrado com sucesso!" },
       { status: 201 }
